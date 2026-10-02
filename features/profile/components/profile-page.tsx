@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BellRing, BriefcaseBusiness, KeyRound, Mail, ShieldCheck, User2 } from "lucide-react";
+import { BriefcaseBusiness, Mail, MapPin, User2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,15 +14,24 @@ import { Separator } from "@/components/ui/separator";
 import { appToast } from "@/lib/app-toast";
 
 const quickStats = [
-  { label: "Open assignments", value: "6", note: "Across frontend and triage flows." },
-  { label: "Critical ownership", value: "2", note: "High-priority bugs currently under review." },
-  { label: "Response SLA", value: "92%", note: "Average within current sprint." },
-] as const;
-
-const preferences = [
-  { title: "Issue notifications", description: "Slack, email, and in-app alerts are enabled for assigned issues.", icon: BellRing },
-  { title: "Security", description: "SSO active with backup email verification for critical workspace actions.", icon: ShieldCheck },
-  { title: "Access scope", description: "Engineering Lead access across dashboard, kanban, teams, and settings.", icon: KeyRound },
+  {
+    label: "Open Tasks",
+    value: "12",
+    note: "Issues currently in progress.",
+    color: "text-blue-500",
+  },
+  {
+    label: "Closed Tasks",
+    value: "148",
+    note: "Completed in this quarter.",
+    color: "text-green-500",
+  },
+  {
+    label: "Avg. Lead Time",
+    value: "2.4d",
+    note: "Average time to resolution.",
+    color: "text-orange-500",
+  },
 ] as const;
 
 export function ProfilePage() {
@@ -38,7 +47,7 @@ export function ProfilePage() {
   function handleSave() {
     appToast.success({
       title: "Profile updated",
-      description: "Your profile details have been saved to the workspace view.",
+      description: "Your profile details have been saved successfully.",
     });
   }
 
@@ -49,155 +58,99 @@ export function ProfilePage() {
       toolbar={
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Personal workspace profile</h2>
-            <p className="text-sm text-muted-foreground">
-              Manage your identity, role context, and personal preferences for the bug tracker workspace.
-            </p>
+            <h2 className="text-xl font-bold tracking-tight">Personal Workspace</h2>
+            <p className="text-sm text-muted-foreground">Manage your identity and team role within the workspace.</p>
           </div>
-          <Button onClick={handleSave} variant="outline">Save changes</Button>
         </div>
       }
     >
       <div className="space-y-6">
-        <Card>
-          <CardContent className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <Avatar className="size-16">
-                <AvatarFallback className="text-lg">RA</AvatarFallback>
-              </Avatar>
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-2xl font-semibold tracking-tight">Raka Aditya</h3>
-                  <Badge variant="secondary">Engineering Lead</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">Owner for triage coordination, issue review, and squad routing.</p>
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                  <span className="inline-flex items-center gap-2">
-                    <Mail className="size-4" />
-                    raka@bugtracker.app
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <BriefcaseBusiness className="size-4" />
-                    Frontend squad
-                  </span>
+        <Card className="overflow-hidden shadow-sm">
+          <CardContent className="p-5">
+            <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-5">
+                <Avatar className="size-20 border shadow-sm lg:size-24">
+                  <AvatarFallback className="text-2xl font-medium bg-muted text-muted-foreground">RA</AvatarFallback>
+                </Avatar>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-2xl font-bold tracking-tight">{profile.fullName}</h3>
+                    <Badge variant="secondary" className="font-medium">
+                      {profile.role}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <Mail className="size-4 opacity-70" />
+                      {profile.email}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="size-4 opacity-70" />
+                      {profile.location}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 lg:w-[24rem]">
-              {quickStats.map((item) => (
-                <div key={item.label} className="rounded-xl border bg-muted/30 p-4">
-                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">{item.label}</p>
-                  <p className="mt-2 text-2xl font-semibold">{item.value}</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.note}</p>
-                </div>
-              ))}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:w-[32rem]">
+                {quickStats.map((item) => (
+                  <div key={item.label} className="flex flex-col justify-between rounded-xl border bg-muted/20 p-4 transition-colors hover:bg-muted/30">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">{item.label}</p>
+                      <p className={`mt-1 text-3xl font-bold tracking-tight ${item.color}`}>{item.value}</p>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground/80 line-clamp-2">{item.note}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Account details</CardTitle>
-              <CardDescription>Basic identity information shown across issue ownership and team routing.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="full-name">Full name</Label>
-                  <Input id="full-name" onChange={(event) => setProfile((current) => ({ ...current, fullName: event.target.value }))} value={profile.fullName} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="display-name">Display name</Label>
-                  <Input id="display-name" onChange={(event) => setProfile((current) => ({ ...current, displayName: event.target.value }))} value={profile.displayName} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Work email</Label>
-                  <Input id="email" onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} type="email" value={profile.email} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Input id="role" onChange={(event) => setProfile((current) => ({ ...current, role: event.target.value }))} value={profile.role} />
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="team">Primary squad</Label>
-                  <Input id="team" onChange={(event) => setProfile((current) => ({ ...current, team: event.target.value }))} value={profile.team} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="location">Work location</Label>
-                  <Input id="location" onChange={(event) => setProfile((current) => ({ ...current, location: event.target.value }))} value={profile.location} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Workspace preferences</CardTitle>
-              <CardDescription>Quick summary of your active access and communication preferences.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {preferences.map((item) => {
-                const Icon = item.icon;
-
-                return (
-                  <div key={item.title} className="rounded-xl border bg-muted/20 p-4">
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex size-9 items-center justify-center rounded-xl bg-background text-primary shadow-sm">
-                        <Icon className="size-4" />
-                      </span>
-                      <div className="space-y-1">
-                        <p className="font-medium">{item.title}</p>
-                        <p className="text-sm leading-6 text-muted-foreground">{item.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </div>
-
+        {/* Account Details Form */}
         <Card>
           <CardHeader>
-            <CardTitle>Profile visibility</CardTitle>
-            <CardDescription>Preview of how your identity appears in issue cards, assignments, and comments.</CardDescription>
+            <div className="flex items-center gap-2">
+              <User2 className="size-5 text-primary" />
+              <CardTitle>Account Details</CardTitle>
+            </div>
+            <CardDescription>Update your primary information used for issue ownership and team routing.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border p-4">
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback>RA</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium">Issue assignee</p>
-                  <p className="text-sm text-muted-foreground">Shown on kanban cards and issue detail panels.</p>
-                </div>
+          <CardContent className="space-y-8">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="full-name">Full Name</Label>
+                <Input id="full-name" onChange={(e) => setProfile((prev) => ({ ...prev, fullName: e.target.value }))} value={profile.fullName} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="display-name">Display Name</Label>
+                <Input id="display-name" onChange={(e) => setProfile((prev) => ({ ...prev, displayName: e.target.value }))} value={profile.displayName} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="email">Work Email</Label>
+                <Input id="email" type="email" onChange={(e) => setProfile((prev) => ({ ...prev, email: e.target.value }))} value={profile.email} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="role">Role</Label>
+                <Input id="role" onChange={(e) => setProfile((prev) => ({ ...prev, role: e.target.value }))} value={profile.role} />
               </div>
             </div>
-            <div className="rounded-xl border p-4">
-              <div className="flex items-center gap-3">
-                <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                  <User2 className="size-4" />
-                </span>
-                <div>
-                  <p className="font-medium">Team ownership</p>
-                  <p className="text-sm text-muted-foreground">Used for PIC routing and team directory listings.</p>
+
+            <Separator />
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="team">Primary Squad</Label>
+                <div className="relative">
+                  <BriefcaseBusiness className="absolute left-3 top-3 size-4 text-muted-foreground" />
+                  <Input id="team" className="pl-9" onChange={(e) => setProfile((prev) => ({ ...prev, team: e.target.value }))} value={profile.team} />
                 </div>
               </div>
-            </div>
-            <div className="rounded-xl border p-4">
-              <div className="flex items-center gap-3">
-                <Badge variant="outline">Engineering Lead</Badge>
-                <div>
-                  <p className="font-medium">Role badge</p>
-                  <p className="text-sm text-muted-foreground">Visible in access-sensitive workspace sections.</p>
+              <div className="grid gap-2">
+                <Label htmlFor="location">Work Location</Label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-3 size-4 text-muted-foreground" />
+                  <Input id="location" className="pl-9" onChange={(e) => setProfile((prev) => ({ ...prev, location: e.target.value }))} value={profile.location} />
                 </div>
               </div>
             </div>

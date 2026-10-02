@@ -84,6 +84,39 @@ export type ChangelogEntry = {
   category: "Feature" | "Improvement" | "Fix";
 };
 
+export type AuditTrailAction =
+  | "Issue updated"
+  | "Assignment changed"
+  | "Status changed"
+  | "Priority changed"
+  | "Project updated"
+  | "Role updated"
+  | "Permission changed"
+  | "Login attempt";
+
+export type AuditTrailTarget =
+  | "Issue"
+  | "Project"
+  | "Team"
+  | "Workspace"
+  | "Authentication";
+
+export type AuditTrailOutcome = "Success" | "Warning" | "Blocked";
+
+export type AuditTrailEntry = {
+  id: string;
+  actor: string;
+  actorRole: string;
+  action: AuditTrailAction;
+  targetType: AuditTrailTarget;
+  targetName: string;
+  team: string;
+  outcome: AuditTrailOutcome;
+  ipAddress: string;
+  createdAt: string;
+  detail: string;
+};
+
 function newId(value: string) {
   return value;
 }
@@ -406,6 +439,165 @@ export const changelogEntries: ChangelogEntry[] = [
     summary: "Recent fixes improved release summaries, timestamp consistency, and issue reporting clarity.",
     highlights: ["Improved webhook retry timestamp consistency.", "Refined release health summaries in the workspace.", "Improved issue data presentation across tracking screens."],
     category: "Fix",
+  },
+];
+
+export const auditTrailEntries: AuditTrailEntry[] = [
+  {
+    id: "AUD-301",
+    actor: "Raka Aditya",
+    actorRole: "Engineering Lead",
+    action: "Assignment changed",
+    targetType: "Issue",
+    targetName: "BUG-218",
+    team: "Frontend",
+    outcome: "Success",
+    ipAddress: "10.10.24.18",
+    createdAt: "2026-04-12T09:15:00+07:00",
+    detail: "PIC issue dipindahkan dari Mira Indah ke Alif Latif untuk percepatan review upload fix.",
+  },
+  {
+    id: "AUD-302",
+    actor: "Mira Indah",
+    actorRole: "Platform Lead",
+    action: "Status changed",
+    targetType: "Issue",
+    targetName: "BUG-214",
+    team: "Platform",
+    outcome: "Success",
+    ipAddress: "10.10.18.42",
+    createdAt: "2026-04-12T10:05:00+07:00",
+    detail: "Status issue berubah dari Ready ke Investigating setelah reproduksi koneksi offline berhasil.",
+  },
+  {
+    id: "AUD-303",
+    actor: "Dina Nanda",
+    actorRole: "Core Lead",
+    action: "Priority changed",
+    targetType: "Issue",
+    targetName: "BUG-231",
+    team: "Core",
+    outcome: "Warning",
+    ipAddress: "10.10.31.11",
+    createdAt: "2026-04-12T10:24:00+07:00",
+    detail: "Prioritas dinaikkan menjadi Critical setelah blocker count pada sprint summary tidak sinkron.",
+  },
+  {
+    id: "AUD-304",
+    actor: "Laras Mahesa",
+    actorRole: "Release Manager",
+    action: "Project updated",
+    targetType: "Project",
+    targetName: "Release Ops",
+    team: "Core",
+    outcome: "Success",
+    ipAddress: "10.10.31.28",
+    createdAt: "2026-04-12T11:40:00+07:00",
+    detail: "Milestone rollback policy review diperbarui untuk penyesuaian jadwal release approval.",
+  },
+  {
+    id: "AUD-305",
+    actor: "Cahya Yusuf",
+    actorRole: "Platform Engineer",
+    action: "Issue updated",
+    targetType: "Issue",
+    targetName: "BUG-233",
+    team: "Platform",
+    outcome: "Success",
+    ipAddress: "10.10.18.57",
+    createdAt: "2026-04-12T13:10:00+07:00",
+    detail: "Catatan audit log drawer diperbarui untuk menyimpan stack trace multiline tanpa truncation.",
+  },
+  {
+    id: "AUD-306",
+    actor: "Putri Ramadhani",
+    actorRole: "QA Analyst",
+    action: "Login attempt",
+    targetType: "Authentication",
+    targetName: "Workspace Admin",
+    team: "Core",
+    outcome: "Blocked",
+    ipAddress: "10.10.40.9",
+    createdAt: "2026-04-12T13:38:00+07:00",
+    detail: "Percobaan akses ke area admin diblokir karena role tidak memiliki permission elevated settings.",
+  },
+  {
+    id: "AUD-307",
+    actor: "Aulia Rahman",
+    actorRole: "Product Owner",
+    action: "Permission changed",
+    targetType: "Workspace",
+    targetName: "Bug Tracker Web",
+    team: "Core",
+    outcome: "Success",
+    ipAddress: "10.10.40.19",
+    createdAt: "2026-04-12T14:22:00+07:00",
+    detail: "Hak akses export issue report ditambahkan untuk role Product Owner di workspace utama.",
+  },
+  {
+    id: "AUD-308",
+    actor: "Raka Aditya",
+    actorRole: "Engineering Lead",
+    action: "Role updated",
+    targetType: "Team",
+    targetName: "Frontend",
+    team: "Frontend",
+    outcome: "Success",
+    ipAddress: "10.10.24.18",
+    createdAt: "2026-04-12T15:04:00+07:00",
+    detail: "Role reviewer default pada squad Frontend diperbarui untuk alur approval bugfix kritikal.",
+  },
+  {
+    id: "AUD-309",
+    actor: "Kevin Tan",
+    actorRole: "SRE",
+    action: "Issue updated",
+    targetType: "Issue",
+    targetName: "BUG-226",
+    team: "Platform",
+    outcome: "Success",
+    ipAddress: "10.10.18.66",
+    createdAt: "2026-04-12T16:17:00+07:00",
+    detail: "Rollback deployment notes ditambahkan agar release tag tetap tersimpan saat release dibatalkan.",
+  },
+  {
+    id: "AUD-310",
+    actor: "Nadia Valencia",
+    actorRole: "Frontend Engineer",
+    action: "Status changed",
+    targetType: "Issue",
+    targetName: "BUG-196",
+    team: "Frontend",
+    outcome: "Success",
+    ipAddress: "10.10.24.44",
+    createdAt: "2026-04-12T17:03:00+07:00",
+    detail: "Issue overlap banner dipindahkan ke status Done setelah verifikasi layout pada editor selesai.",
+  },
+  {
+    id: "AUD-311",
+    actor: "Satria Wibowo",
+    actorRole: "Frontend Engineer",
+    action: "Assignment changed",
+    targetType: "Issue",
+    targetName: "BUG-224",
+    team: "Frontend",
+    outcome: "Warning",
+    ipAddress: "10.10.24.51",
+    createdAt: "2026-04-12T17:46:00+07:00",
+    detail: "Issue mention autocomplete diambil alih sementara karena assignee sebelumnya sedang on leave.",
+  },
+  {
+    id: "AUD-312",
+    actor: "Firda Rosiana Tanj",
+    actorRole: "Workspace Admin",
+    action: "Permission changed",
+    targetType: "Workspace",
+    targetName: "Incident Center",
+    team: "Platform",
+    outcome: "Success",
+    ipAddress: "10.10.8.12",
+    createdAt: "2026-04-12T18:12:00+07:00",
+    detail: "Permission audit export diaktifkan untuk kebutuhan compliance review bulanan.",
   },
 ];
 
