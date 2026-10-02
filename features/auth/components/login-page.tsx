@@ -43,14 +43,39 @@ export function LoginPage() {
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+     console.log("handleSubmit dipanggil");
 
-    appToast.success({
-      title: "Login successful",
-      description: email ? `Welcome back, ${email}. Redirecting to your workspace.` : "Redirecting to your workspace.",
-    });
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
 
-    startTransition(() => {
-      router.push("/");
+        const data = await res.json();
+
+        if (!res.ok) {
+          appToast.error({
+            title: "Login gagal",
+            description: data.error ?? "Terjadi kesalahan, coba lagi.",
+          });
+          return;
+        }
+
+        appToast.success({
+          title: "Login successful",
+          description: `Welcome back, ${data.user.name}. Redirecting to your workspace.`,
+        });
+
+        router.push("/");
+        router.refresh();
+      } catch {
+        appToast.error({
+          title: "Login gagal",
+          description: "Tidak bisa terhubung ke server, coba lagi.",
+        });
+      }
     });
   }
 
@@ -176,6 +201,8 @@ export function LoginPage() {
                       value={email}
                       type="email"
                       placeholder="you@company.com"
+                      disabled={isPending}
+                      required
                     />
                   </div>
 
@@ -195,13 +222,15 @@ export function LoginPage() {
                       value={password}
                       type="password"
                       placeholder="Enter your password"
+                      disabled={isPending}
+                      required
                     />
                   </div>
 
-                  <Button className="w-full" disabled={isPending} size="lg">
-                    Sign in to dashboard
-                    <ArrowRight />
-                  </Button>
+                 <Button className="w-full" disabled={isPending} size="lg" type="submit">
+                  {isPending ? "Signing in..." : "Sign in to dashboard"}
+                  <ArrowRight />
+                </Button>
                 </form>
 
                 <div className="rounded-xl border bg-muted/40 p-3.5">

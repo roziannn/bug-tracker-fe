@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronRight, ChevronsUpDown, CircleDot, CreditCard, FileSearch, FileSearch2, FolderKanban, FolderOpenDot, Gauge, History, KanbanSquare, LogOut, PencilLine, Plus, Settings, UserCircle2, Users } from "lucide-react";
-
+import { useCurrentUser } from "@/components/app/user-provider";
 import { NotificationDropdown } from "@/components/shared/navigation/notification-dropdown";
 import { ThemeToggle } from "@/components/shared/theme/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -62,6 +62,12 @@ type NavigationItem = {
   children?: readonly NavigationChild[];
 };
 
+type CurrentUser = {
+  name: string;
+  email: string;
+};
+
+
 const navigation: readonly NavigationItem[] = [
   { id: "overview", label: "Overview", href: "/", icon: Gauge },
   { id: "issues", label: "All Issues", href: "/issues", icon: CircleDot, badge: "34" },
@@ -82,6 +88,12 @@ const navigation: readonly NavigationItem[] = [
   { id: "audit-trail", label: "Audit Trail", href: "/audit-trail", icon: FileSearch2 },
 ] as const;
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
 export function AppShell({
   activeNav,
   title,
@@ -94,20 +106,32 @@ export function AppShell({
   const pathname = usePathname();
   const resolvedBreadcrumbs = breadcrumbs?.length ? breadcrumbs : [{ label: title }];
   const [isSettingsOpen, setIsSettingsOpen] = useState(pathname.startsWith("/settings"));
-
+  const { user, clearUser } = useCurrentUser();
   useEffect(() => {
     if (pathname.startsWith("/settings")) {
       setIsSettingsOpen(true);
     }
   }, [pathname]);
 
-  function handleLogout() {
+ 
+
+ async function handleLogout() {
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } finally {
+    clearUser();
     appToast.success({
       title: "Logged out successfully",
       description: "You have been signed out from the bug tracker workspace.",
     });
     router.push("/login");
+    router.refresh();
   }
+}
+
+  const displayName = user?.name ?? "...";
+  const displayEmail = user?.email ?? "";
+  const initials = user?.name ? getInitials(user.name) : "..";
 
   return (
     <SidebarProvider defaultOpen>
@@ -193,11 +217,11 @@ export function AppShell({
               render={
                 <button className="flex w-full items-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-accent/60 px-3 py-2.5 text-left transition-all hover:bg-sidebar-accent group-data-[collapsible=icon]:size-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:hover:bg-transparent">
                   <Avatar data-size="lg">
-                    <AvatarFallback>FT</AvatarFallback>
+                    <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                    <p className="truncate text-sm font-medium">Firda Rosiana Tanj</p>
-                    <p className="truncate text-xs text-sidebar-foreground/60">firda@bugtracker.app</p>
+                    <p className="truncate text-sm font-medium">{displayName}</p>
+                    <p className="truncate text-xs text-sidebar-foreground/60">{displayEmail}</p>
                   </div>
                   <ChevronsUpDown className="size-4 text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden" />
                 </button>
@@ -206,11 +230,11 @@ export function AppShell({
             <DropdownMenuContent align="end" className="w-72 rounded-xl p-0" side="top" sideOffset={8}>
               <div className="flex items-center gap-3 px-3 py-3">
                 <Avatar data-size="lg">
-                  <AvatarFallback>FT</AvatarFallback>
+                  <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">Firda Rosiana Tanj</p>
-                  <p className="truncate text-xs text-muted-foreground">firda@bugtracker.app</p>
+                  <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+                  <p className="truncate text-xs text-muted-foreground">{displayEmail}</p>
                 </div>
               </div>
               <DropdownMenuSeparator />

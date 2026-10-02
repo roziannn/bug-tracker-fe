@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import { Providers } from "@/components/app/providers";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { IdleLogoutWatcher } from "@/components/app/idle-logout-watcher";
+import { UserProvider } from "@/components/app/user-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -41,7 +43,12 @@ export default function RootLayout({
         className="min-h-full bg-background text-foreground"
       >
         <Providers>
-          <TooltipProvider>{children}</TooltipProvider>
+          <UserProvider>
+            <TooltipProvider>
+              <IdleLogoutWatcher />
+              {children}
+            </TooltipProvider>
+          </UserProvider>
         </Providers>
       </body>
     </html>
