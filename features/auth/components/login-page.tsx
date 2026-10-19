@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Bug,
+  CheckCircle2,
+  LockKeyhole,
   Globe,
   Mail,
   ShieldCheck,
@@ -25,6 +27,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { appToast } from "@/lib/app-toast";
+
+const highlights = [
+  "Kanban triage board with drag and drop workflow",
+  "Issue severity, ownership, and release visibility in one place",
+  "Dark mode and consistent shadcn-based product UI",
+];
 
 export function LoginPage() {
   const router = useRouter();
@@ -110,6 +118,49 @@ export function LoginPage() {
                 Masuk untuk melanjutkan triage dan memantau issue.
               </p>
             </div>
+
+            <div className="hidden gap-4 md:grid md:grid-cols-3">
+              <Card className="bg-card/85 backdrop-blur">
+                <CardHeader>
+                  <Bug className="size-5 text-primary" />
+                  <CardTitle className="text-base">Track every bug</CardTitle>
+                  <CardDescription>Catat dan pantau issue dari satu tempat.</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="bg-card/85 backdrop-blur">
+                <CardHeader>
+                  <LockKeyhole className="size-5 text-primary" />
+                  <CardTitle className="text-base">SSO ready</CardTitle>
+                  <CardDescription>Masuk aman untuk internal workspace.</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="bg-card/85 backdrop-blur">
+                <CardHeader>
+                  <CheckCircle2 className="size-5 text-primary" />
+                  <CardTitle className="text-base">Fast triage</CardTitle>
+                  <CardDescription>Board, issue list, dan notes tetap sinkron.</CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+
+            <Card className="max-w-2xl bg-card/80 backdrop-blur">
+              <CardHeader>
+                <CardTitle className="text-lg">What you get after login</CardTitle>
+                <CardDescription>
+                  Fondasi auth ini tetap satu desain dengan shell bug tracker yang sudah ada.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {highlights.map((item) => (
+                  <div key={item} className="flex items-start gap-3">
+                    <span className="mt-0.5 flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <CheckCircle2 className="size-3.5" />
+                    </span>
+                    <p className="text-sm leading-6 text-muted-foreground">{item}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           </section>
 
           <section className="order-1 flex justify-center lg:order-2 lg:self-center lg:justify-end">
