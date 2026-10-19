@@ -119,7 +119,7 @@ const issuesByPriority = priorityOrder.map((priority) => ({
 const issuesByStatus = statusOrder.map((status) => ({
   status,
   total: issues.filter((issue) => issue.status === status).length,
-  fill: `var(--color-${status})`,
+  fill: statusChartConfig[status].color,
 }));
 
 const totalIssues = issues.length;
