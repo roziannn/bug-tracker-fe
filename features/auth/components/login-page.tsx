@@ -6,10 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Bug,
-  CheckCircle2,
-  FolderKanban,
   Globe,
-  LockKeyhole,
   Mail,
   ShieldCheck,
 } from "lucide-react";
@@ -28,12 +25,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { appToast } from "@/lib/app-toast";
-
-const highlights = [
-  "Kanban triage board with drag and drop workflow",
-  "Issue severity, ownership, and release visibility in one place",
-  "Dark mode and consistent shadcn-based product UI",
-];
 
 export function LoginPage() {
   const router = useRouter();
@@ -94,13 +85,10 @@ export function LoginPage() {
             className="inline-flex max-w-[calc(100%-4rem)] items-center gap-3 rounded-full border bg-card/80 px-3 py-2 backdrop-blur sm:px-4"
           >
             <span className="flex size-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-              <FolderKanban className="size-5" />
+              <Bug className="size-5" />
             </span>
             <span className="min-w-0">
               <span className="block text-sm font-semibold">Bug Tracker</span>
-              <span className="hidden text-xs text-muted-foreground sm:block">
-                Quality operations workspace
-              </span>
             </span>
           </Link>
 
@@ -114,57 +102,14 @@ export function LoginPage() {
               Secure engineering access
             </Badge>
 
-            <div className="max-w-2xl space-y-3">
-              <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl xl:text-5xl">
-                Login yang lebih rapi untuk tim yang ngurus bug setiap hari.
+            <div className="max-w-xl space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+                Kelola bug tim Anda dengan lebih rapi.
               </h1>
-              <p className="max-w-xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
-                Masuk ke dashboard bug tracker, lanjutkan triage sprint, dan pantau issue kritikal tanpa layout auth yang terasa generik.
+              <p className="text-sm leading-6 text-muted-foreground sm:text-base">
+                Masuk untuk melanjutkan triage dan memantau issue.
               </p>
             </div>
-
-            <div className="hidden gap-4 md:grid md:grid-cols-3">
-              <Card className="bg-card/85 backdrop-blur">
-                <CardHeader>
-                  <Bug className="size-5 text-primary" />
-                  <CardTitle className="text-base">34 open bugs</CardTitle>
-                  <CardDescription>Prioritas issue aktif lintas squad.</CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="bg-card/85 backdrop-blur">
-                <CardHeader>
-                  <LockKeyhole className="size-5 text-primary" />
-                  <CardTitle className="text-base">SSO ready</CardTitle>
-                  <CardDescription>Masuk aman untuk internal workspace.</CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="bg-card/85 backdrop-blur">
-                <CardHeader>
-                  <CheckCircle2 className="size-5 text-primary" />
-                  <CardTitle className="text-base">Fast triage</CardTitle>
-                  <CardDescription>Board, issue list, dan notes tetap sinkron.</CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-
-            <Card className="max-w-2xl bg-card/80 backdrop-blur">
-              <CardHeader>
-                <CardTitle className="text-lg">What you get after login</CardTitle>
-                <CardDescription>
-                  Fondasi auth ini tetap satu desain dengan shell bug tracker yang sudah ada.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {highlights.map((item) => (
-                  <div key={item} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <CheckCircle2 className="size-3.5" />
-                    </span>
-                    <p className="text-sm leading-6 text-muted-foreground">{item}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
           </section>
 
           <section className="order-1 flex justify-center lg:order-2 lg:self-center lg:justify-end">
@@ -172,7 +117,7 @@ export function LoginPage() {
               <CardHeader className="space-y-2 pb-4">
                 <CardTitle className="text-xl sm:text-2xl">Welcome back</CardTitle>
                 <CardDescription>
-                  Sign in ke workspace engineering untuk lanjut review, assign, dan move issue antar status.
+                  Sign in to continue to your workspace.
                 </CardDescription>
               </CardHeader>
 
@@ -236,13 +181,6 @@ export function LoginPage() {
                   <ArrowRight />
                 </Button>
                 </form>
-
-                <div className="rounded-xl border bg-muted/40 p-3.5">
-                  <p className="text-sm font-medium">Demo access</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Use your internal engineering account or SSO to access sprint triage, kanban workflow, and release health reports.
-                  </p>
-                </div>
 
                 <p className="text-center text-sm text-muted-foreground">
                   Need access from another team?{" "}
