@@ -250,8 +250,8 @@ export function DashboardOverview() {
                 <ChartContainer className="h-55 w-full" config={teamChartConfig}>
                   <BarChart accessibilityLayer data={issuesByTeam} margin={{ top: 12, right: 8, left: 8, bottom: 0 }}>
                     <CartesianGrid vertical={false} />
-                    <XAxis axisLine={false} dataKey="team" tickLine={false} tickMargin={10} />
-                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} width={28} />
+                    <XAxis tick={{ fill: "var(--foreground)", fillOpacity: 0.85 }} axisLine={false} dataKey="team" tickLine={false} tickMargin={10} />
+                    <YAxis tick={{ fill: "var(--foreground)", fillOpacity: 0.85 }} allowDecimals={false} axisLine={false} tickLine={false} width={28} />
                     <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => [`${value} issues`, "Open load"]} hideLabel />} />
                     <Bar dataKey="total" radius={10}>
                       {issuesByTeam.map((entry) => (
@@ -329,7 +329,7 @@ export function DashboardOverview() {
                   <BarChart accessibilityLayer data={issuesByStatus} layout="vertical" margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                     <CartesianGrid horizontal={false} />
                     <XAxis allowDecimals={false} axisLine={false} tickLine={false} type="number" hide />
-                    <YAxis axisLine={false} dataKey="status" tickLine={false} tickMargin={10} type="category" width={84} />
+                    <YAxis tick={{ fill: "var(--foreground)", fillOpacity: 0.85 }} axisLine={false} dataKey="status" tickLine={false} tickMargin={10} type="category" width={84} />
                     <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => [`${value} issues`, "Status load"]} hideLabel />} />
                     <Bar dataKey="total" radius={10}>
                       {issuesByStatus.map((entry) => (
