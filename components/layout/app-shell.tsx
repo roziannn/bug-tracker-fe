@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronRight, ChevronsUpDown, CircleDot, CreditCard, FileSearch, FileSearch2, FolderKanban, FolderOpenDot, Gauge, History, KanbanSquare, LogOut, PencilLine, Plus, Settings, UserCircle2, Users } from "lucide-react";
+import { Bell, Bug, ChevronRight, ChevronsUpDown, CircleDot, CreditCard, FileSearch, FileSearch2, FolderKanban, FolderOpenDot, Gauge, History, KanbanSquare, LogOut, PencilLine, Plus, Settings, UserCircle2, Users } from "lucide-react";
 import { useCurrentUser } from "@/components/app/user-provider";
 import { NotificationDropdown } from "@/components/shared/navigation/notification-dropdown";
 import { ThemeToggle } from "@/components/shared/theme/theme-toggle";
@@ -137,15 +137,14 @@ export function AppShell({
     <SidebarProvider defaultOpen>
       <Sidebar collapsible="icon" variant="inset">
        <SidebarHeader className="gap-3 p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2">
-  <div className="flex items-center gap-3 rounded-xl border border-sidebar-border bg-sidebar-accent/50 px-3 py-3 transition-all group-data-[collapsible=icon]:size-14 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-2xl group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:border-transparent">
-    
-    <div className="flex size-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground transition-all group-data-[collapsible=icon]:size-9">
-      <FolderKanban className="size-5" />
+  <div className="flex items-center gap-3 px-2 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+      <Bug className="size-5" />
     </div>
 
     <div className="min-w-0 group-data-[collapsible=icon]:hidden">
       <p className="truncate text-sm font-semibold">Bug Tracker</p>
-      <p className="truncate text-xs text-sidebar-foreground/70">Engineering workspace</p>
+      <p className="truncate text-xs text-sidebar-foreground/70">Version 1.0.0</p>
     </div>
   </div>
 </SidebarHeader>
