@@ -43,9 +43,13 @@ export function LoginPage() {
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-     console.log("handleSubmit dipanggil");
 
-    startTransition(async () => {
+    // TEMP: auth dinonaktifkan sementara, langsung ke dashboard.
+    // Hapus baris di bawah dan uncomment blok startTransition untuk mengaktifkan lagi.
+    router.push("/");
+    return;
+
+    /* startTransition(async () => {
       try {
         const res = await fetch("/api/auth/login", {
           method: "POST",
@@ -76,7 +80,7 @@ export function LoginPage() {
           description: "Tidak bisa terhubung ke server, coba lagi.",
         });
       }
-    });
+    }); */
   }
 
   return (
