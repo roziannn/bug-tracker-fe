@@ -27,9 +27,18 @@ function applyTheme(theme: Theme) {
   const resolvedTheme = theme === "system" ? getSystemTheme() : theme;
   const root = document.documentElement;
 
+  // Matikan semua transition sesaat supaya seluruh elemen berganti warna serentak.
+  const style = document.createElement("style");
+  style.appendChild(document.createTextNode("*,*::before,*::after{transition:none!important}"));
+  document.head.appendChild(style);
+
   root.classList.remove("light", "dark");
   root.classList.add(resolvedTheme);
   root.style.colorScheme = resolvedTheme;
+
+  // Paksa reflow sebelum style dilepas agar transition tidak jalan.
+  void window.getComputedStyle(root).opacity;
+  requestAnimationFrame(() => requestAnimationFrame(() => style.remove()));
 
   return resolvedTheme;
 }
