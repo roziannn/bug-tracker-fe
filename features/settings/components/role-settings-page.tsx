@@ -64,13 +64,43 @@ export function RoleSettingsPage() {
       eyebrow="Configuration"
       title="Settings"
       toolbar={
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Role settings</h2>
             <p className="text-sm text-muted-foreground">
               Kelola role, lalu atur menu dan button yang aktif lewat halaman access masing-masing role.
             </p>
           </div>
+
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger render={<Button />}>
+              <Plus />
+              Add Role
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Add new role</DialogTitle>
+                <DialogDescription>Akses menu dan button bisa diatur setelah role dibuat.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-2">
+                <label htmlFor="role-name" className="text-sm font-medium">
+                  Role name
+                </label>
+                <Input
+                  id="role-name"
+                  value={roleName}
+                  onChange={(event) => setRoleName(event.target.value)}
+                  placeholder="Contoh: Product Manager"
+                />
+              </div>
+              <DialogFooter showCloseButton>
+                <Button onClick={createRole}>
+                  <Plus />
+                  Add role
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       }
     >
@@ -81,36 +111,6 @@ export function RoleSettingsPage() {
               <CardTitle>Roles</CardTitle>
               <CardDescription>Pilih Configure access untuk mengatur menu dan button per role.</CardDescription>
             </div>
-
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger render={<Button />}>
-                <Plus />
-                Add Role
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Add new role</DialogTitle>
-                  <DialogDescription>Akses menu dan button bisa diatur setelah role dibuat.</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-2">
-                  <label htmlFor="role-name" className="text-sm font-medium">
-                    Role name
-                  </label>
-                  <Input
-                    id="role-name"
-                    value={roleName}
-                    onChange={(event) => setRoleName(event.target.value)}
-                    placeholder="Contoh: Product Manager"
-                  />
-                </div>
-                <DialogFooter showCloseButton>
-                  <Button onClick={createRole}>
-                    <Plus />
-                    Add role
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </div>
         </CardHeader>
         <CardContent>
