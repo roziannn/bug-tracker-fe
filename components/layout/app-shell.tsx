@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Bug, ChevronRight, ChevronsUpDown, CircleDot, CreditCard, FileSearch, FileSearch2, FolderKanban, FolderOpenDot, Gauge, History, KanbanSquare, LogOut, PencilLine, Plus, Settings, UserCircle2, Users } from "lucide-react";
+import { Bell, Bug, ChevronRight, ChevronsUpDown, CircleDot, CreditCard, FileSearch, FileSearch2, FolderKanban, FolderOpenDot, Gauge, KanbanSquare, LogOut, PencilLine, Plus, Settings, UserCircle2, Users } from "lucide-react";
 import { useCurrentUser } from "@/components/app/user-provider";
 import { NotificationDropdown } from "@/components/shared/navigation/notification-dropdown";
 import { ThemeToggle } from "@/components/shared/theme/theme-toggle";
@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 import { appToast } from "@/lib/app-toast";
 
 type AppShellProps = {
-  activeNav: "overview" | "issues" | "kanban" | "teams" | "projects" | "changelog" | "settings" | "audit-trail";
+  activeNav: "overview" | "issues" | "kanban" | "teams" | "projects" | "settings" | "audit-trail";
   eyebrow?: string;
   title: string;
   toolbar?: ReactNode;
@@ -74,15 +74,13 @@ const navigation: readonly NavigationItem[] = [
   { id: "kanban", label: "Kanban", href: "/kanban", icon: KanbanSquare },
   { id: "teams", label: "Teams", href: "/teams", icon: Users },
   { id: "projects", label: "Projects", href: "/projects", icon: FolderOpenDot },
-  { id: "changelog", label: "Changelog", href: "/changelog", icon: History },
   {
     id: "settings-group",
     label: "Settings",
     icon: Settings,
     children: [
       { id: "role", label: "Role", href: "/settings/role" },
-      { id: "menu", label: "Menu", href: "/settings/menu" },
-      { id: "permission", label: "Permission", href: "/settings/permission" },
+      { id: "environment", label: "Environment", href: "/settings/environment" },
     ],
   },
   { id: "audit-trail", label: "Audit Trail", href: "/audit-trail", icon: FileSearch2 },

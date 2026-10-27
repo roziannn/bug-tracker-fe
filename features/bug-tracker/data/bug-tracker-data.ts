@@ -75,15 +75,6 @@ export type ProjectMetric = {
   createdAt: string;
 };
 
-export type ChangelogEntry = {
-  version: string;
-  releasedOn: string;
-  headline: string;
-  summary: string;
-  highlights: string[];
-  category: "Feature" | "Improvement" | "Fix";
-};
-
 export type AuditTrailAction =
   | "Issue updated"
   | "Assignment changed"
@@ -412,33 +403,6 @@ export const projectMetrics: ProjectMetric[] = [
     environment: "Staging",
     repository: "github.com/company/release-ops",
     createdAt: "2026-02-10",
-  },
-];
-
-export const changelogEntries: ChangelogEntry[] = [
-  {
-    version: "v2.8.1",
-    releasedOn: "2026-04-11",
-    headline: "Management flows expanded across workspace",
-    summary: "Projects, teams, settings, and issue creation now have dedicated management flows inside the bug tracker.",
-    highlights: ["Added create and detail flows for projects.", "Added team group maintenance and per-team member management pages.", "Expanded settings pages for menu, permission, and environment configuration."],
-    category: "Feature",
-  },
-  {
-    version: "v2.8.0",
-    releasedOn: "2026-04-09",
-    headline: "Kanban workflow and navigation polish",
-    summary: "The kanban board was cleaned up to focus on drag-and-drop flow while rules moved into a dialog.",
-    highlights: ["Made the kanban board full-width.", "Moved board rules into a modal dialog trigger.", "Improved navigation consistency for major workspace sections."],
-    category: "Improvement",
-  },
-  {
-    version: "v2.7.9",
-    releasedOn: "2026-04-04",
-    headline: "Stability and release visibility updates",
-    summary: "Recent fixes improved release summaries, timestamp consistency, and issue reporting clarity.",
-    highlights: ["Improved webhook retry timestamp consistency.", "Refined release health summaries in the workspace.", "Improved issue data presentation across tracking screens."],
-    category: "Fix",
   },
 ];
 
