@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlignLeft, Check, CheckSquare, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Tag, Trash2, UserPlus, X } from "lucide-react";
+import { AlignLeft, Check, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Tag, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -281,6 +281,248 @@ function initials(name: string) {
 
 type DetailPanel = "labels" | "dates" | "members" | null;
 
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const REMINDER_OPTIONS = [
+  { value: "none", label: "None" },
+  { value: "at-time", label: "At time of due date" },
+  { value: "5m", label: "5 Minutes before" },
+  { value: "10m", label: "10 Minutes before" },
+  { value: "15m", label: "15 Minutes before" },
+  { value: "1h", label: "1 Hour before" },
+  { value: "2h", label: "2 Hours before" },
+  { value: "1d", label: "1 Day before" },
+  { value: "2d", label: "2 Days before" },
+];
+
+function toIsoDate(year: number, month: number, day: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function formatDateTime(date: string, time?: string) {
+  const [year, month, day] = date.split("-");
+  return `${Number(day)}/${Number(month)}/${year}${time ? ` ${time}` : ""}`;
+}
+
+type DatesDraft = {
+  startEnabled: boolean;
+  start: string;
+  dueEnabled: boolean;
+  due: string;
+  time: string;
+  reminder: string;
+};
+
+function DatesPopover({
+  issue,
+  onSave,
+  onRemove,
+  onClose,
+}: {
+  issue: IssueRecord;
+  onSave: (patch: Pick<IssueRecord, "startDate" | "dueDate" | "dueTime" | "reminder">) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  const today = new Date();
+  const todayIso = toIsoDate(today.getFullYear(), today.getMonth(), today.getDate());
+  const [draft, setDraft] = useState<DatesDraft>({
+    startEnabled: Boolean(issue.startDate),
+    start: issue.startDate ?? "",
+    dueEnabled: Boolean(issue.dueDate),
+    due: issue.dueDate ?? "",
+    time: issue.dueTime ?? "12:00",
+    reminder: issue.reminder ?? "none",
+  });
+  const anchor = draft.due || draft.start || todayIso;
+  const [view, setView] = useState({ year: Number(anchor.slice(0, 4)), month: Number(anchor.slice(5, 7)) - 1 });
+  const [target, setTarget] = useState<"start" | "due">("due");
+
+  const firstWeekday = (new Date(view.year, view.month, 1).getDay() + 6) % 7;
+  const cells = Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(view.year, view.month, index - firstWeekday + 1);
+    return {
+      iso: toIsoDate(date.getFullYear(), date.getMonth(), date.getDate()),
+      day: date.getDate(),
+      inMonth: date.getMonth() === view.month,
+    };
+  });
+  const monthLabel = new Date(view.year, view.month, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+
+  function shift(months: number) {
+    const next = new Date(view.year, view.month + months, 1);
+    setView({ year: next.getFullYear(), month: next.getMonth() });
+  }
+
+  function pick(iso: string) {
+    if (target === "start" && draft.startEnabled) setDraft({ ...draft, start: iso });
+    else setDraft({ ...draft, dueEnabled: true, due: iso });
+  }
+
+  function save() {
+    onSave({
+      startDate: draft.startEnabled && draft.start ? draft.start : undefined,
+      dueDate: draft.dueEnabled && draft.due ? draft.due : undefined,
+      dueTime: draft.dueEnabled && draft.due ? draft.time : undefined,
+      reminder: draft.dueEnabled && draft.due && draft.reminder !== "none" ? draft.reminder : undefined,
+    });
+    onClose();
+  }
+
+  return (
+    <div className="absolute top-full left-0 z-20 mt-2 w-80 rounded-xl border bg-popover p-4 text-popover-foreground shadow-lg">
+      <div className="relative mb-3 text-center text-sm font-semibold">
+        Dates
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Close dates"
+          className="absolute top-1/2 right-0 -translate-y-1/2"
+          onClick={onClose}
+        >
+          <X />
+        </Button>
+      </div>
+
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex">
+          <Button variant="ghost" size="icon-sm" aria-label="Previous year" onClick={() => shift(-12)}>
+            <ChevronsLeft />
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label="Previous month" onClick={() => shift(-1)}>
+            <ChevronLeft />
+          </Button>
+        </div>
+        <span className="text-sm font-semibold">{monthLabel}</span>
+        <div className="flex">
+          <Button variant="ghost" size="icon-sm" aria-label="Next month" onClick={() => shift(1)}>
+            <ChevronRight />
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label="Next year" onClick={() => shift(12)}>
+            <ChevronsRight />
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 text-center text-xs">
+        {WEEKDAYS.map((weekday) => (
+          <span key={weekday} className="py-1 font-semibold">
+            {weekday}
+          </span>
+        ))}
+        {cells.map((cell) => {
+          const isDue = draft.dueEnabled && draft.due === cell.iso;
+          const isStart = draft.startEnabled && draft.start === cell.iso;
+
+          return (
+            <button
+              key={cell.iso}
+              type="button"
+              onClick={() => pick(cell.iso)}
+              className={cn(
+                "h-8 rounded-md text-sm hover:bg-muted",
+                !cell.inMonth && "text-muted-foreground/60",
+                cell.iso === todayIso && "underline decoration-primary decoration-2 underline-offset-4",
+                (isDue || isStart) && "bg-primary/20 font-semibold text-primary"
+              )}
+            >
+              {cell.day}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        <div className="grid gap-1.5">
+          <span className="text-xs font-semibold">Start date</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              aria-label="Enable start date"
+              checked={draft.startEnabled}
+              onChange={(event) => {
+                setTarget("start");
+                setDraft({ ...draft, startEnabled: event.target.checked, start: draft.start || todayIso });
+              }}
+            />
+            <Input
+              type="date"
+              aria-label="Start date"
+              disabled={!draft.startEnabled}
+              value={draft.start}
+              onFocus={() => setTarget("start")}
+              onChange={(event) => setDraft({ ...draft, start: event.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <span className="text-xs font-semibold">Due date</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              aria-label="Enable due date"
+              checked={draft.dueEnabled}
+              onChange={(event) => {
+                setTarget("due");
+                setDraft({ ...draft, dueEnabled: event.target.checked, due: draft.due || todayIso });
+              }}
+            />
+            <Input
+              type="date"
+              aria-label="Due date"
+              disabled={!draft.dueEnabled}
+              value={draft.due}
+              onFocus={() => setTarget("due")}
+              onChange={(event) => setDraft({ ...draft, due: event.target.value })}
+            />
+            <Input
+              type="time"
+              aria-label="Due time"
+              className="w-28"
+              disabled={!draft.dueEnabled}
+              value={draft.time}
+              onChange={(event) => setDraft({ ...draft, time: event.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <span className="text-xs font-semibold">Set due date reminder</span>
+          <Select
+            value={draft.reminder}
+            onValueChange={(value) => setDraft({ ...draft, reminder: value ?? "none" })}
+          >
+            <SelectTrigger className="w-full" disabled={!draft.dueEnabled}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {REMINDER_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Button onClick={save}>Save</Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            onRemove();
+            onClose();
+          }}
+        >
+          Remove
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function IssueDetailDialog({
   issue,
   onClose,
@@ -390,6 +632,16 @@ function IssueDetailDialog({
                       <Icon />
                       {label}
                     </Button>
+                    {id === "dates" && panel === "dates" ? (
+                      <DatesPopover
+                        issue={issue}
+                        onClose={() => setPanel(null)}
+                        onRemove={() =>
+                          onChange(issue.id, { startDate: undefined, dueDate: undefined, dueTime: undefined, reminder: undefined })
+                        }
+                        onSave={(patch) => onChange(issue.id, patch)}
+                      />
+                    ) : null}
                     {id === "members" && panel === "members" ? (
                       <div className="absolute top-full left-0 z-20 mt-2 w-72 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg">
                         <div className="relative mb-3 text-center text-sm font-semibold">
@@ -455,21 +707,14 @@ function IssueDetailDialog({
                   placeholder="Label, mis. Frontend"
                 />
               ) : null}
-              {panel === "dates" ? (
-                <Input
-                  aria-label="Due date"
-                  type="date"
-                  value={issue.dueDate ?? ""}
-                  onChange={(event) => onChange(issue.id, { dueDate: event.target.value || undefined })}
-                />
-              ) : null}
 
               <div className="flex flex-wrap gap-2">
                 <Badge variant={priorityVariant(issue.priority)}>{issue.priority}</Badge>
                 <Badge variant="outline">{issue.team}</Badge>
                 {issue.label !== "None" ? <Badge variant="secondary">{issue.label}</Badge> : null}
                 {issue.assignee !== "Unassigned" ? <Badge variant="outline">{issue.assignee}</Badge> : null}
-                {issue.dueDate ? <Badge variant="outline">Due {issue.dueDate}</Badge> : null}
+                {issue.startDate ? <Badge variant="outline">Start {formatDateTime(issue.startDate)}</Badge> : null}
+                {issue.dueDate ? <Badge variant="outline">Due {formatDateTime(issue.dueDate, issue.dueTime)}</Badge> : null}
               </div>
 
               <section className="grid gap-2">
