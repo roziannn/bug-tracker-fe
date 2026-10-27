@@ -187,10 +187,6 @@ export function TeamMembersPage({ id }: { id: string }) {
     >
       <div className="space-y-6">
         <Card>
-          <CardHeader>
-            <CardTitle>Current members</CardTitle>
-            <CardDescription>Daftar member yang saat ini terhubung ke team {teamName}.</CardDescription>
-          </CardHeader>
           <CardContent className="space-y-2">
             <Table>
               <TableHeader>

@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -218,16 +218,6 @@ export function EnvironmentSettingsPage() {
     >
       <div className="space-y-4">
         <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <CardTitle>Environment configuration</CardTitle>
-                <CardDescription>
-                  Semua environment bisa diedit inline tanpa membuka card detail.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
