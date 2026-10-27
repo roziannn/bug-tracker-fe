@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlignLeft, Check, FolderOpenDot, Link2, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Tag, Trash2, UserPlus, X } from "lucide-react";
+import { AlignLeft, Check, FolderOpenDot, Link2, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -280,7 +280,7 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-type DetailPanel = "labels" | "dates" | "members" | "issues" | null;
+type DetailPanel = "dates" | "members" | "issues" | null;
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -594,7 +594,6 @@ function IssueDetailDialog({
   }
 
   const actionButtons = [
-    { id: "labels" as const, label: "Labels", icon: Tag },
     { id: "dates" as const, label: "Dates", icon: Clock },
     { id: "members" as const, label: "Members", icon: UserPlus },
   ];
@@ -774,17 +773,8 @@ function IssueDetailDialog({
                 </Button>
               </div>
 
-              {panel === "labels" ? (
-                <Input
-                  aria-label="Label"
-                  value={issue.label === "None" ? "" : issue.label}
-                  onChange={(event) => onChange(issue.id, { label: event.target.value || "None" })}
-                  placeholder="Label, mis. Frontend"
-                />
-              ) : null}
 
               <div className="flex flex-wrap gap-2">
-                {issue.label !== "None" ? <Badge variant="secondary">{issue.label}</Badge> : null}
                 {issue.assignee !== "Unassigned" ? <Badge variant="outline">{issue.assignee}</Badge> : null}
                 {issue.startDate ? <Badge variant="outline">Start {formatDateTime(issue.startDate)}</Badge> : null}
                 {issue.dueDate ? <Badge variant="outline">Due {formatDateTime(issue.dueDate, issue.dueTime)}</Badge> : null}
