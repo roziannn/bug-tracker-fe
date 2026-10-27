@@ -132,13 +132,87 @@ export function EnvironmentSettingsPage() {
       eyebrow="Configuration"
       title="Settings"
       toolbar={
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Environment settings</h2>
             <p className="text-sm text-muted-foreground">
               Edit environment app, endpoint API, database profile, dan status koneksi langsung dari tabel.
             </p>
           </div>
+
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger render={<Button />}>
+            <Plus />
+            Add Environment
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Add new environment</DialogTitle>
+              <DialogDescription>
+                Tambahkan environment baru beserta endpoint API, database profile, dan status awalnya.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="environment-name" className="text-sm font-medium">
+                  Environment name
+                </label>
+                <Input
+                  id="environment-name"
+                  value={environmentName}
+                  onChange={(event) => setEnvironmentName(event.target.value)}
+                  placeholder="Contoh: UAT"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <label htmlFor="environment-api-base" className="text-sm font-medium">
+                  API Base URL
+                </label>
+                <Input
+                  id="environment-api-base"
+                  value={apiBase}
+                  onChange={(event) => setApiBase(event.target.value)}
+                  placeholder="Contoh: https://uat.bugtracker.internal/api"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <label htmlFor="environment-database" className="text-sm font-medium">
+                  Database
+                </label>
+                <Input
+                  id="environment-database"
+                  value={database}
+                  onChange={(event) => setDatabase(event.target.value)}
+                  placeholder="Contoh: Replica Postgres"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Status</label>
+                <Select value={status} onValueChange={(value) => setStatus((value ?? "Active") as EnvironmentStatus)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Synced">Synced</SelectItem>
+                    <SelectItem value="Protected">Protected</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter showCloseButton>
+              <Button onClick={createEnvironment}>
+                <Plus />
+                Add environment
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         </div>
       }
     >
@@ -152,80 +226,6 @@ export function EnvironmentSettingsPage() {
                   Semua environment bisa diedit inline tanpa membuka card detail.
                 </CardDescription>
               </div>
-
-              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogTrigger render={<Button />}>
-                  <Plus />
-                  Add Environment
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Add new environment</DialogTitle>
-                    <DialogDescription>
-                      Tambahkan environment baru beserta endpoint API, database profile, dan status awalnya.
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <div className="grid gap-4">
-                    <div className="grid gap-2">
-                      <label htmlFor="environment-name" className="text-sm font-medium">
-                        Environment name
-                      </label>
-                      <Input
-                        id="environment-name"
-                        value={environmentName}
-                        onChange={(event) => setEnvironmentName(event.target.value)}
-                        placeholder="Contoh: UAT"
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <label htmlFor="environment-api-base" className="text-sm font-medium">
-                        API Base URL
-                      </label>
-                      <Input
-                        id="environment-api-base"
-                        value={apiBase}
-                        onChange={(event) => setApiBase(event.target.value)}
-                        placeholder="Contoh: https://uat.bugtracker.internal/api"
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <label htmlFor="environment-database" className="text-sm font-medium">
-                        Database
-                      </label>
-                      <Input
-                        id="environment-database"
-                        value={database}
-                        onChange={(event) => setDatabase(event.target.value)}
-                        placeholder="Contoh: Replica Postgres"
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Status</label>
-                      <Select value={status} onValueChange={(value) => setStatus((value ?? "Active") as EnvironmentStatus)}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Active">Active</SelectItem>
-                          <SelectItem value="Synced">Synced</SelectItem>
-                          <SelectItem value="Protected">Protected</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <DialogFooter showCloseButton>
-                    <Button onClick={createEnvironment}>
-                      <Plus />
-                      Add environment
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
             </div>
           </CardHeader>
           <CardContent>
