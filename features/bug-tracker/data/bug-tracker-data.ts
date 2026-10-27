@@ -12,6 +12,9 @@ export type IssueRecord = {
   createdAt: string;
   summary?: string;
   completed?: boolean;
+  archived?: boolean;
+  inactive?: boolean;
+  members?: string[];
   project?: string;
   linkedIssues?: string[];
   startDate?: string;

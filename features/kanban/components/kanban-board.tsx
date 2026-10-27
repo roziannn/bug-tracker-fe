@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlignLeft, Check, FolderOpenDot, Link2, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
+import { AlignLeft, Archive, Ban, Check, FolderOpenDot, Link2, MoreHorizontal, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -111,7 +118,9 @@ function IssueCard({
       onDragEnd={onDragEnd}
       className={cn(
         "cursor-grab border border-foreground/15 bg-card dark:bg-zinc-800 shadow-md transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg active:cursor-grabbing",
-        dragging && "opacity-55 ring-2 ring-primary/30"
+        dragging && "opacity-55 ring-2 ring-primary/30",
+        issue.inactive && "opacity-60 grayscale",
+        issue.archived && "border-dashed"
       )}
     >
       <CardHeader>
@@ -120,6 +129,8 @@ function IssueCard({
             <CardTitle className="flex items-center gap-1.5 text-sm">
               {issue.completed ? <Check className="size-4 text-emerald-500" strokeWidth={3} /> : null}
               {issue.id}
+              {issue.archived ? <span className="text-xs font-normal text-muted-foreground">Archived</span> : null}
+              {issue.inactive ? <span className="text-xs font-normal text-muted-foreground">Inactive</span> : null}
             </CardTitle>
             <CardDescription className="mt-1 leading-6 text-foreground/90">
               {issue.title}
@@ -598,6 +609,35 @@ function IssueDetailDialog({
       item.id !== issue?.id &&
       `${item.id} ${item.title}`.toLowerCase().includes(issueQuery.trim().toLowerCase())
   );
+  const cardMembers = issue?.members ?? (issue && issue.assignee !== "Unassigned" ? [issue.assignee] : []);
+  const joined = cardMembers.includes(CURRENT_AUTHOR);
+
+  function setCardMembers(next: string[]) {
+    if (issue) onChange(issue.id, { members: next, assignee: next[0] ?? "Unassigned" });
+  }
+
+  function toggleJoin() {
+    setCardMembers(joined ? cardMembers.filter((name) => name !== CURRENT_AUTHOR) : [...cardMembers, CURRENT_AUTHOR]);
+  }
+
+  useEffect(() => {
+    if (!issue) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (event.code !== "Space" || event.repeat) return;
+      if (target?.closest("input, textarea, select, button, [contenteditable], [role='switch']")) return;
+
+      event.preventDefault();
+      toggleJoin();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+    // toggleJoin closes over the current members, so re-bind when they change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issue?.id, joined, cardMembers.length]);
+
   const filteredMembers = members.filter((name) => name.toLowerCase().includes(memberQuery.trim().toLowerCase()));
 
   function setChecklists(next: NonNullable<IssueRecord["checklists"]>) {
@@ -648,9 +688,38 @@ function IssueDetailDialog({
           <div className="grid h-full grid-rows-[auto] overflow-y-auto md:grid-cols-[minmax(0,1fr)_26rem] md:grid-rows-1 md:overflow-hidden">
             <div className="space-y-6 p-6 md:h-full md:overflow-y-auto">
               <DialogHeader className="space-y-1">
-                <DialogDescription>
-                  {issue.id} · in list
-                </DialogDescription>
+                <div className="flex items-center justify-between gap-2 pr-1">
+                  <DialogDescription>{issue.id} · in list</DialogDescription>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={<Button variant="ghost" size="icon-sm" aria-label="Card actions" />}
+                    >
+                      <MoreHorizontal />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem className="justify-between" onClick={toggleJoin}>
+                        <span className="flex items-center gap-2">
+                          <UserPlus className="size-4" />
+                          {joined ? "Leave" : "Join"}
+                        </span>
+                        <DropdownMenuShortcut>Space</DropdownMenuShortcut>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onChange(issue.id, { inactive: !issue.inactive })}>
+                        <Ban className="size-4" />
+                        {issue.inactive ? "Make active" : "Make inactive"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          onChange(issue.id, { archived: !issue.archived });
+                          if (!issue.archived) onClose();
+                        }}
+                      >
+                        <Archive className="size-4" />
+                        {issue.archived ? "Send to board" : "Archive"}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
                 <DialogTitle className="sr-only">{issue.title}</DialogTitle>
                 <div className="flex items-center gap-2">
                   <CompleteToggle
@@ -790,14 +859,16 @@ function IssueDetailDialog({
                         <ul className="grid max-h-60 gap-1 overflow-y-auto">
                           {filteredMembers.length ? (
                             filteredMembers.map((name) => {
-                              const selected = issue.assignee === name;
+                              const selected = cardMembers.includes(name);
 
                               return (
                                 <li key={name}>
                                   <button
                                     type="button"
                                     className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
-                                    onClick={() => onChange(issue.id, { assignee: selected ? "Unassigned" : name })}
+                                    onClick={() =>
+                                      setCardMembers(selected ? cardMembers.filter((item) => item !== name) : [...cardMembers, name])
+                                    }
                                   >
                                     <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
                                       {initials(name)}
@@ -824,7 +895,13 @@ function IssueDetailDialog({
 
 
               <div className="flex flex-wrap gap-2">
-                {issue.assignee !== "Unassigned" ? <Badge variant="outline">{issue.assignee}</Badge> : null}
+                {cardMembers.map((name) => (
+                  <Badge key={name} variant="outline">
+                    {name}
+                  </Badge>
+                ))}
+                {issue.archived ? <Badge variant="secondary">Archived</Badge> : null}
+                {issue.inactive ? <Badge variant="secondary">Inactive</Badge> : null}
                 {issue.startDate ? <Badge variant="outline">Start {formatDateTime(issue.startDate)}</Badge> : null}
                 {issue.dueDate ? <Badge variant="outline">Due {formatDateTime(issue.dueDate, issue.dueTime)}</Badge> : null}
               </div>
@@ -1122,6 +1199,7 @@ export function KanbanBoard() {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [userNames, setUserNames] = useState<string[]>([]);
 
   useEffect(() => {
@@ -1174,9 +1252,9 @@ export function KanbanBoard() {
     () =>
       kanbanColumns.map((column) => ({
         ...column,
-        issues: issues.filter((issue) => issue.status === column.id),
+        issues: issues.filter((issue) => issue.status === column.id && (showArchived || !issue.archived)),
       })).filter((column) => column.id !== "Backlog"),
-    [issues]
+    [issues, showArchived]
   );
 
   function moveIssue(issueId: string, nextStatus: IssueStatus) {
@@ -1226,6 +1304,11 @@ export function KanbanBoard() {
               </CardDescription>
             </div>
 
+            <div className="flex shrink-0 flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setShowArchived((current) => !current)}>
+              <Archive />
+              {showArchived ? "Hide archived" : "Show archived"}
+            </Button>
             <Dialog>
               <DialogTrigger
                 render={
@@ -1268,6 +1351,7 @@ export function KanbanBoard() {
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
