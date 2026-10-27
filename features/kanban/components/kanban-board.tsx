@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckSquare, GripVertical, ListFilter, MessageSquare, Plus, Search, Trash2, X } from "lucide-react";
+import { CheckSquare, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -274,11 +274,15 @@ function IssueDetailDialog({
   issue,
   onClose,
   onChange,
+  onDelete,
 }: {
   issue: IssueRecord | null;
   onClose: () => void;
   onChange: (issueId: string, patch: Partial<IssueRecord>) => void;
+  onDelete: (issueId: string) => void;
 }) {
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
   const [taskText, setTaskText] = useState("");
   const [commentText, setCommentText] = useState("");
   const checklist = issue?.checklist ?? [];
@@ -382,9 +386,21 @@ function IssueDetailDialog({
                         })
                       }
                     />
-                    <span className={cn("flex-1 text-sm", item.done && "text-muted-foreground line-through")}>
-                      {item.text}
-                    </span>
+                    <Input
+                      aria-label="Task text"
+                      className={cn(
+                        "h-8 flex-1 border-transparent bg-transparent px-1 shadow-none focus-visible:border-input",
+                        item.done && "text-muted-foreground line-through"
+                      )}
+                      value={item.text}
+                      onChange={(event) =>
+                        onChange(issue.id, {
+                          checklist: checklist.map((task) =>
+                            task.id === item.id ? { ...task, text: event.target.value } : task
+                          ),
+                        })
+                      }
+                    />
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -428,11 +444,70 @@ function IssueDetailDialog({
                       <span className="font-medium text-foreground">{comment.author}</span>
                       <span>{new Date(comment.createdAt).toLocaleString("id-ID")}</span>
                     </div>
-                    <p className="mt-1 text-sm leading-6">{comment.text}</p>
+                    {editingCommentId === comment.id ? (
+                      <div className="mt-2 grid gap-2">
+                        <Textarea value={editingCommentText} onChange={(event) => setEditingCommentText(event.target.value)} />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const text = editingCommentText.trim();
+                              if (!text) return;
+                              onChange(issue.id, {
+                                comments: comments.map((item) => (item.id === comment.id ? { ...item, text } : item)),
+                              });
+                              setEditingCommentId(null);
+                            }}
+                          >
+                            Save
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingCommentId(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="mt-1 text-sm leading-6">{comment.text}</p>
+                        <div className="mt-2 flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={() => {
+                              setEditingCommentId(comment.id);
+                              setEditingCommentText(comment.text);
+                            }}
+                          >
+                            <Pencil />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={() => onChange(issue.id, { comments: comments.filter((item) => item.id !== comment.id) })}
+                          >
+                            <Trash2 />
+                            Delete
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
             </div>
+
+            <DialogFooter showCloseButton>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (window.confirm(`Hapus card ${issue.id}?`)) onDelete(issue.id);
+                }}
+              >
+                <Trash2 />
+                Delete card
+              </Button>
+            </DialogFooter>
           </>
         ) : null}
       </DialogContent>
@@ -487,6 +562,11 @@ export function KanbanBoard() {
 
   function updateIssue(issueId: string, patch: Partial<IssueRecord>) {
     setIssues((current) => current.map((issue) => (issue.id === issueId ? { ...issue, ...patch } : issue)));
+  }
+
+  function deleteIssue(issueId: string) {
+    setIssues((current) => current.filter((issue) => issue.id !== issueId));
+    setSelectedId(null);
   }
 
   function addCard(status: IssueStatus, title: string) {
@@ -600,6 +680,7 @@ export function KanbanBoard() {
         issue={issues.find((issue) => issue.id === selectedId) ?? null}
         onClose={() => setSelectedId(null)}
         onChange={updateIssue}
+        onDelete={deleteIssue}
       />
     </AppShell>
   );
