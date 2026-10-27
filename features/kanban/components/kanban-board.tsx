@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlignLeft, CheckSquare, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Tag, Trash2, UserPlus, X } from "lucide-react";
+import { AlignLeft, Check, CheckSquare, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Tag, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -286,13 +286,16 @@ function IssueDetailDialog({
   onClose,
   onChange,
   onDelete,
+  members,
 }: {
   issue: IssueRecord | null;
+  members: string[];
   onClose: () => void;
   onChange: (issueId: string, patch: Partial<IssueRecord>) => void;
   onDelete: (issueId: string) => void;
 }) {
   const [panel, setPanel] = useState<DetailPanel>(null);
+  const [memberQuery, setMemberQuery] = useState("");
   const [hideChecked, setHideChecked] = useState<Record<string, boolean>>({});
   const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
   const [addingItemTo, setAddingItemTo] = useState<string | null>(null);
@@ -302,6 +305,7 @@ function IssueDetailDialog({
   const [commentText, setCommentText] = useState("");
   const checklists = issue?.checklists ?? [];
   const comments = issue?.comments ?? [];
+  const filteredMembers = members.filter((name) => name.toLowerCase().includes(memberQuery.trim().toLowerCase()));
 
   function setChecklists(next: NonNullable<IssueRecord["checklists"]>) {
     if (issue) onChange(issue.id, { checklists: next });
@@ -381,10 +385,61 @@ function IssueDetailDialog({
 
               <div className="flex flex-wrap gap-2">
                 {actionButtons.map(({ id, label, icon: Icon }) => (
-                  <Button key={id} variant="outline" onClick={() => setPanel(panel === id ? null : id)}>
-                    <Icon />
-                    {label}
-                  </Button>
+                  <div key={id} className="relative">
+                    <Button variant="outline" onClick={() => setPanel(panel === id ? null : id)}>
+                      <Icon />
+                      {label}
+                    </Button>
+                    {id === "members" && panel === "members" ? (
+                      <div className="absolute top-full left-0 z-20 mt-2 w-72 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg">
+                        <div className="relative mb-3 text-center text-sm font-semibold">
+                          Members
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label="Close members"
+                            className="absolute top-1/2 right-0 -translate-y-1/2"
+                            onClick={() => setPanel(null)}
+                          >
+                            <X />
+                          </Button>
+                        </div>
+                        <Input
+                          autoFocus
+                          aria-label="Search members"
+                          value={memberQuery}
+                          onChange={(event) => setMemberQuery(event.target.value)}
+                          placeholder="Search members"
+                        />
+                        <p className="mt-3 mb-1 text-xs font-semibold text-muted-foreground">Board members</p>
+                        <ul className="grid max-h-60 gap-1 overflow-y-auto">
+                          {filteredMembers.length ? (
+                            filteredMembers.map((name) => {
+                              const selected = issue.assignee === name;
+
+                              return (
+                                <li key={name}>
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+                                    onClick={() => onChange(issue.id, { assignee: selected ? "Unassigned" : name })}
+                                  >
+                                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                                      {initials(name)}
+                                    </span>
+                                    <span className="flex-1 truncate">{name}</span>
+                                    {selected ? <Check className="size-4" /> : null}
+                                  </button>
+                                </li>
+                              );
+                            })
+                          ) : (
+                            <li className="px-2 py-2 text-sm text-muted-foreground">No members found.</li>
+                          )}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
                 ))}
                 <Button variant="outline" onClick={addChecklist}>
                   <CheckSquare />
@@ -406,14 +461,6 @@ function IssueDetailDialog({
                   type="date"
                   value={issue.dueDate ?? ""}
                   onChange={(event) => onChange(issue.id, { dueDate: event.target.value || undefined })}
-                />
-              ) : null}
-              {panel === "members" ? (
-                <Input
-                  aria-label="Assignee"
-                  value={issue.assignee === "Unassigned" ? "" : issue.assignee}
-                  onChange={(event) => onChange(issue.id, { assignee: event.target.value || "Unassigned" })}
-                  placeholder="Nama member"
                 />
               ) : null}
 
@@ -703,6 +750,7 @@ export function KanbanBoard() {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [userNames, setUserNames] = useState<string[]>([]);
 
   useEffect(() => {
     try {
@@ -722,6 +770,24 @@ export function KanbanBoard() {
     }
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    fetch("/api/users?pageSize=100")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { data?: { Name: string }[] } | null) => setUserNames((body?.data ?? []).map((user) => user.Name)))
+      .catch(() => setUserNames([]));
+  }, []);
+
+  const members = useMemo(
+    () => [
+      ...new Set([
+        CURRENT_AUTHOR,
+        ...userNames,
+        ...issues.map((issue) => issue.assignee).filter((name) => name && name !== "Unassigned"),
+      ]),
+    ],
+    [issues, userNames]
+  );
 
   useEffect(() => {
     if (!hydrated) return;
@@ -867,6 +933,7 @@ export function KanbanBoard() {
 
       <IssueDetailDialog
         issue={issues.find((issue) => issue.id === selectedId) ?? null}
+        members={members}
         onClose={() => setSelectedId(null)}
         onChange={updateIssue}
         onDelete={deleteIssue}
