@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlignLeft, Check, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Tag, Trash2, UserPlus, X } from "lucide-react";
+import { AlignLeft, Check, FolderOpenDot, Link2, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Tag, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import {
   issues as initialIssues,
   kanbanColumns,
   priorityVariant,
+  projectOptions,
   type IssueRecord,
   type IssueStatus,
 } from "@/features/bug-tracker/data/bug-tracker-data";
@@ -279,7 +280,7 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-type DetailPanel = "labels" | "dates" | "members" | null;
+type DetailPanel = "labels" | "dates" | "members" | "issues" | null;
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -528,14 +529,17 @@ function IssueDetailDialog({
   onClose,
   onChange,
   members,
+  allIssues,
 }: {
   issue: IssueRecord | null;
   members: string[];
+  allIssues: Pick<IssueRecord, "id" | "title">[];
   onClose: () => void;
   onChange: (issueId: string, patch: Partial<IssueRecord>) => void;
 }) {
   const [panel, setPanel] = useState<DetailPanel>(null);
   const [memberQuery, setMemberQuery] = useState("");
+  const [issueQuery, setIssueQuery] = useState("");
   const [hideChecked, setHideChecked] = useState<Record<string, boolean>>({});
   const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
   const [addingItemTo, setAddingItemTo] = useState<string | null>(null);
@@ -545,6 +549,12 @@ function IssueDetailDialog({
   const [commentText, setCommentText] = useState("");
   const checklists = issue?.checklists ?? [];
   const comments = issue?.comments ?? [];
+  const linkedIssues = issue?.linkedIssues ?? [];
+  const filteredIssues = allIssues.filter(
+    (item) =>
+      item.id !== issue?.id &&
+      `${item.id} ${item.title}`.toLowerCase().includes(issueQuery.trim().toLowerCase())
+  );
   const filteredMembers = members.filter((name) => name.toLowerCase().includes(memberQuery.trim().toLowerCase()));
 
   function setChecklists(next: NonNullable<IssueRecord["checklists"]>) {
@@ -606,21 +616,88 @@ function IssueDetailDialog({
                   value={issue.title}
                   onChange={(event) => onChange(issue.id, { title: event.target.value })}
                 />
-                <Select
-                  value={issue.status}
-                  onValueChange={(value) => value && onChange(issue.id, { status: value as IssueStatus })}
-                >
-                  <SelectTrigger className="w-44">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {kanbanColumns.map((column) => (
-                      <SelectItem key={column.id} value={column.id}>
-                        {column.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={issue.project ?? "none"}
+                    onValueChange={(value) =>
+                      onChange(issue.id, { project: !value || value === "none" ? undefined : value })
+                    }
+                  >
+                    <SelectTrigger className="w-56">
+                      <FolderOpenDot />
+                      <SelectValue placeholder="Tag project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No project</SelectItem>
+                      {projectOptions.map((project) => (
+                        <SelectItem key={project.value} value={project.value}>
+                          {project.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="relative">
+                    <Button variant="outline" onClick={() => setPanel(panel === "issues" ? null : "issues")}>
+                      <Link2 />
+                      Link issue
+                    </Button>
+                    {panel === "issues" ? (
+                      <div className="absolute top-full left-0 z-20 mt-2 w-80 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg">
+                        <div className="relative mb-3 text-center text-sm font-semibold">
+                          Issues
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label="Close issues"
+                            className="absolute top-1/2 right-0 -translate-y-1/2"
+                            onClick={() => setPanel(null)}
+                          >
+                            <X />
+                          </Button>
+                        </div>
+                        <Input
+                          autoFocus
+                          aria-label="Search issues"
+                          value={issueQuery}
+                          onChange={(event) => setIssueQuery(event.target.value)}
+                          placeholder="Search issues"
+                        />
+                        <ul className="mt-3 grid max-h-60 gap-1 overflow-y-auto">
+                          {filteredIssues.length ? (
+                            filteredIssues.map((item) => {
+                              const linked = linkedIssues.includes(item.id);
+
+                              return (
+                                <li key={item.id}>
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+                                    onClick={() =>
+                                      onChange(issue.id, {
+                                        linkedIssues: linked
+                                          ? linkedIssues.filter((id) => id !== item.id)
+                                          : [...linkedIssues, item.id],
+                                      })
+                                    }
+                                  >
+                                    <span className="flex-1">
+                                      <span className="font-medium">{item.id}</span>
+                                      <span className="block text-xs text-muted-foreground">{item.title}</span>
+                                    </span>
+                                    {linked ? <Check className="mt-0.5 size-4 shrink-0" /> : null}
+                                  </button>
+                                </li>
+                              );
+                            })
+                          ) : (
+                            <li className="px-2 py-2 text-sm text-muted-foreground">No issues found.</li>
+                          )}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               </DialogHeader>
 
               <div className="flex flex-wrap gap-2">
@@ -707,13 +784,38 @@ function IssueDetailDialog({
               ) : null}
 
               <div className="flex flex-wrap gap-2">
-                <Badge variant={priorityVariant(issue.priority)}>{issue.priority}</Badge>
-                <Badge variant="outline">{issue.team}</Badge>
                 {issue.label !== "None" ? <Badge variant="secondary">{issue.label}</Badge> : null}
                 {issue.assignee !== "Unassigned" ? <Badge variant="outline">{issue.assignee}</Badge> : null}
                 {issue.startDate ? <Badge variant="outline">Start {formatDateTime(issue.startDate)}</Badge> : null}
                 {issue.dueDate ? <Badge variant="outline">Due {formatDateTime(issue.dueDate, issue.dueTime)}</Badge> : null}
               </div>
+
+              {linkedIssues.length ? (
+                <section className="grid gap-2">
+                  <h3 className="flex items-center gap-3 font-semibold">
+                    <Link2 className="size-5" />
+                    Linked issues
+                  </h3>
+                  <ul className="grid gap-1">
+                    {linkedIssues.map((id) => (
+                      <li key={id} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                        <span className="font-medium">{id}</span>
+                        <span className="flex-1 truncate text-muted-foreground">
+                          {allIssues.find((item) => item.id === id)?.title ?? ""}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label={`Unlink ${id}`}
+                          onClick={() => onChange(issue.id, { linkedIssues: linkedIssues.filter((item) => item !== id) })}
+                        >
+                          <X />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
 
               <section className="grid gap-2">
                 <h3 className="flex items-center gap-3 font-semibold">
@@ -1160,6 +1262,7 @@ export function KanbanBoard() {
       <IssueDetailDialog
         issue={issues.find((issue) => issue.id === selectedId) ?? null}
         members={members}
+        allIssues={issues.map(({ id, title }) => ({ id, title }))}
         onClose={() => setSelectedId(null)}
         onChange={updateIssue}
       />

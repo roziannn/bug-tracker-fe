@@ -11,6 +11,8 @@ export type IssueRecord = {
   label: string | "None";
   createdAt: string;
   summary?: string;
+  project?: string;
+  linkedIssues?: string[];
   startDate?: string;
   dueDate?: string;
   dueTime?: string;
