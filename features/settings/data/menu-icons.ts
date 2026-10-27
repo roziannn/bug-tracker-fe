@@ -11,6 +11,9 @@ export const menuIcons: Record<string, LucideIcon> = {
   Circle,
 };
 
-export function getMenuIcon(name: string): LucideIcon {
+export const NO_ICON = "none";
+
+export function getMenuIcon(name: string): LucideIcon | null {
+  if (name === NO_ICON) return null;
   return menuIcons[name] ?? Circle;
 }

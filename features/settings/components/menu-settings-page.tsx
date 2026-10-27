@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { defaultMenus, type MenuNode } from "@/features/settings/data/access-catalog";
 import { loadMenus, orderMenus, saveMenus, slugify } from "@/features/settings/data/menu-store";
-import { getMenuIcon, menuIcons } from "@/features/settings/data/menu-icons";
+import { getMenuIcon, menuIcons, NO_ICON } from "@/features/settings/data/menu-icons";
 import { cn } from "@/lib/utils";
 
 const ROOT = "none";
@@ -163,9 +163,11 @@ export function MenuSettingsPage() {
                   <TableRow key={menu.id}>
                     <TableCell>
                       <div className={cn("flex items-center gap-3 font-medium", depth && "pl-8")}>
-                        <span className="flex size-8 items-center justify-center rounded-lg bg-muted">
-                          <Icon className="size-4" />
-                        </span>
+                        {Icon ? (
+                          <span className="flex size-8 items-center justify-center rounded-lg bg-muted">
+                            <Icon className="size-4" />
+                          </span>
+                        ) : null}
                         {menu.label}
                       </div>
                     </TableCell>
@@ -260,6 +262,7 @@ export function MenuSettingsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={NO_ICON}>None</SelectItem>
                       {Object.keys(menuIcons).map((name) => (
                         <SelectItem key={name} value={name}>
                           {name}
