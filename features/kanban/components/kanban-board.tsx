@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckSquare, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { AlignLeft, CheckSquare, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Tag, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -98,8 +98,8 @@ function IssueCard({
   onDragEnd: () => void;
   onOpen: (issueId: string) => void;
 }) {
-  const checklist = issue.checklist ?? [];
-  const doneCount = checklist.filter((item) => item.done).length;
+  const items = (issue.checklists ?? []).flatMap((list) => list.items);
+  const doneCount = items.filter((item) => item.done).length;
   const commentCount = issue.comments?.length ?? 0;
 
   return (
@@ -132,17 +132,17 @@ function IssueCard({
         {issue.summary ? (
           <p className="text-sm leading-6 text-muted-foreground">{issue.summary}</p>
         ) : null}
-        {checklist.length || commentCount ? (
+        {items.length || commentCount ? (
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            {checklist.length ? (
+            {items.length ? (
               <span
                 className={cn(
                   "inline-flex items-center gap-1",
-                  doneCount === checklist.length && "text-emerald-600 dark:text-emerald-400"
+                  doneCount === items.length && "text-emerald-600 dark:text-emerald-400"
                 )}
               >
                 <CheckSquare className="size-3.5" />
-                {doneCount}/{checklist.length}
+                {doneCount}/{items.length}
               </span>
             ) : null}
             {commentCount ? (
@@ -270,6 +270,17 @@ function KanbanColumnView({
   );
 }
 
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+type DetailPanel = "labels" | "dates" | "members" | null;
+
 function IssueDetailDialog({
   issue,
   onClose,
@@ -281,21 +292,38 @@ function IssueDetailDialog({
   onChange: (issueId: string, patch: Partial<IssueRecord>) => void;
   onDelete: (issueId: string) => void;
 }) {
+  const [panel, setPanel] = useState<DetailPanel>(null);
+  const [hideChecked, setHideChecked] = useState<Record<string, boolean>>({});
+  const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
+  const [addingItemTo, setAddingItemTo] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(true);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
-  const [taskText, setTaskText] = useState("");
   const [commentText, setCommentText] = useState("");
-  const checklist = issue?.checklist ?? [];
+  const checklists = issue?.checklists ?? [];
   const comments = issue?.comments ?? [];
-  const doneCount = checklist.filter((item) => item.done).length;
-  const progress = checklist.length ? Math.round((doneCount / checklist.length) * 100) : 0;
 
-  function addTask() {
-    const text = taskText.trim();
-    if (!issue || !text) return;
+  function setChecklists(next: NonNullable<IssueRecord["checklists"]>) {
+    if (issue) onChange(issue.id, { checklists: next });
+  }
 
-    onChange(issue.id, { checklist: [...checklist, { id: newId("task"), text, done: false }] });
-    setTaskText("");
+  function patchChecklist(listId: string, patch: Partial<NonNullable<IssueRecord["checklists"]>[number]>) {
+    setChecklists(checklists.map((list) => (list.id === listId ? { ...list, ...patch } : list)));
+  }
+
+  function addChecklist() {
+    const list = { id: newId("list"), title: "Checklist", items: [] };
+    setChecklists([...checklists, list]);
+    setAddingItemTo(list.id);
+  }
+
+  function addItem(listId: string) {
+    const text = (itemDrafts[listId] ?? "").trim();
+    const list = checklists.find((item) => item.id === listId);
+    if (!text || !list) return;
+
+    patchChecklist(listId, { items: [...list.items, { id: newId("task"), text, done: false }] });
+    setItemDrafts((current) => ({ ...current, [listId]: "" }));
   }
 
   function addComment() {
@@ -311,204 +339,356 @@ function IssueDetailDialog({
     setCommentText("");
   }
 
+  const actionButtons = [
+    { id: "labels" as const, label: "Labels", icon: Tag },
+    { id: "dates" as const, label: "Dates", icon: Clock },
+    { id: "members" as const, label: "Members", icon: UserPlus },
+  ];
+
   return (
     <Dialog open={issue !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-5xl">
         {issue ? (
-          <>
-            <DialogHeader>
-              <DialogDescription>{issue.id}</DialogDescription>
-              <DialogTitle>
+          <div className="grid max-h-[92vh] overflow-y-auto md:grid-cols-[minmax(0,1fr)_22rem] md:overflow-hidden">
+            <div className="space-y-6 p-6 md:max-h-[92vh] md:overflow-y-auto">
+              <DialogHeader className="space-y-1">
+                <DialogDescription>
+                  {issue.id} · in list
+                </DialogDescription>
+                <DialogTitle className="sr-only">{issue.title}</DialogTitle>
                 <Input
                   aria-label="Card title"
-                  className="h-9 text-base font-semibold"
+                  className="h-auto border-transparent bg-transparent px-1 text-2xl font-semibold shadow-none focus-visible:border-input"
                   value={issue.title}
                   onChange={(event) => onChange(issue.id, { title: event.target.value })}
                 />
-              </DialogTitle>
-            </DialogHeader>
+                <Select
+                  value={issue.status}
+                  onValueChange={(value) => value && onChange(issue.id, { status: value as IssueStatus })}
+                >
+                  <SelectTrigger className="w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kanbanColumns.map((column) => (
+                      <SelectItem key={column.id} value={column.id}>
+                        {column.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </DialogHeader>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Select value={issue.status} onValueChange={(value) => value && onChange(issue.id, { status: value as IssueStatus })}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {kanbanColumns.map((column) => (
-                    <SelectItem key={column.id} value={column.id}>
-                      {column.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Badge variant={priorityVariant(issue.priority)}>{issue.priority}</Badge>
-              <Badge variant="outline">{issue.team}</Badge>
-            </div>
-
-            <div className="grid gap-2">
-              <label htmlFor="card-description" className="text-sm font-medium">
-                Description
-              </label>
-              <Textarea
-                id="card-description"
-                value={issue.summary ?? ""}
-                onChange={(event) => onChange(issue.id, { summary: event.target.value })}
-                placeholder="Tambahkan deskripsi..."
-              />
-            </div>
-
-            <div className="grid gap-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Checklist</p>
-                {checklist.length ? (
-                  <span className="text-xs text-muted-foreground">
-                    {doneCount}/{checklist.length} · {progress}%
-                  </span>
-                ) : null}
-              </div>
-              {checklist.length ? (
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
-                </div>
-              ) : null}
-              <ul className="grid gap-1">
-                {checklist.map((item) => (
-                  <li key={item.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/50">
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-primary"
-                      checked={item.done}
-                      onChange={(event) =>
-                        onChange(issue.id, {
-                          checklist: checklist.map((task) =>
-                            task.id === item.id ? { ...task, done: event.target.checked } : task
-                          ),
-                        })
-                      }
-                    />
-                    <Input
-                      aria-label="Task text"
-                      className={cn(
-                        "h-8 flex-1 border-transparent bg-transparent px-1 shadow-none focus-visible:border-input",
-                        item.done && "text-muted-foreground line-through"
-                      )}
-                      value={item.text}
-                      onChange={(event) =>
-                        onChange(issue.id, {
-                          checklist: checklist.map((task) =>
-                            task.id === item.id ? { ...task, text: event.target.value } : task
-                          ),
-                        })
-                      }
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Delete ${item.text}`}
-                      onClick={() => onChange(issue.id, { checklist: checklist.filter((task) => task.id !== item.id) })}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </li>
+              <div className="flex flex-wrap gap-2">
+                {actionButtons.map(({ id, label, icon: Icon }) => (
+                  <Button key={id} variant="outline" onClick={() => setPanel(panel === id ? null : id)}>
+                    <Icon />
+                    {label}
+                  </Button>
                 ))}
-              </ul>
-              <div className="flex gap-2">
-                <Input
-                  value={taskText}
-                  onChange={(event) => setTaskText(event.target.value)}
-                  onKeyDown={(event) => event.key === "Enter" && addTask()}
-                  placeholder="Tambah task..."
-                />
-                <Button variant="outline" onClick={addTask}>
-                  <Plus />
-                  Add
+                <Button variant="outline" onClick={addChecklist}>
+                  <CheckSquare />
+                  Checklist
                 </Button>
               </div>
-            </div>
 
-            <div className="grid gap-3">
-              <p className="text-sm font-medium">Comments</p>
-              <div className="flex gap-2">
+              {panel === "labels" ? (
                 <Input
-                  value={commentText}
-                  onChange={(event) => setCommentText(event.target.value)}
-                  onKeyDown={(event) => event.key === "Enter" && addComment()}
-                  placeholder="Tulis comment..."
+                  aria-label="Label"
+                  value={issue.label === "None" ? "" : issue.label}
+                  onChange={(event) => onChange(issue.id, { label: event.target.value || "None" })}
+                  placeholder="Label, mis. Frontend"
                 />
-                <Button onClick={addComment}>Send</Button>
+              ) : null}
+              {panel === "dates" ? (
+                <Input
+                  aria-label="Due date"
+                  type="date"
+                  value={issue.dueDate ?? ""}
+                  onChange={(event) => onChange(issue.id, { dueDate: event.target.value || undefined })}
+                />
+              ) : null}
+              {panel === "members" ? (
+                <Input
+                  aria-label="Assignee"
+                  value={issue.assignee === "Unassigned" ? "" : issue.assignee}
+                  onChange={(event) => onChange(issue.id, { assignee: event.target.value || "Unassigned" })}
+                  placeholder="Nama member"
+                />
+              ) : null}
+
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={priorityVariant(issue.priority)}>{issue.priority}</Badge>
+                <Badge variant="outline">{issue.team}</Badge>
+                {issue.label !== "None" ? <Badge variant="secondary">{issue.label}</Badge> : null}
+                {issue.assignee !== "Unassigned" ? <Badge variant="outline">{issue.assignee}</Badge> : null}
+                {issue.dueDate ? <Badge variant="outline">Due {issue.dueDate}</Badge> : null}
               </div>
-              <ul className="grid gap-2">
-                {[...comments].reverse().map((comment) => (
-                  <li key={comment.id} className="rounded-lg border bg-muted/30 p-3">
-                    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">{comment.author}</span>
-                      <span>{new Date(comment.createdAt).toLocaleString("id-ID")}</span>
+
+              <section className="grid gap-2">
+                <h3 className="flex items-center gap-3 font-semibold">
+                  <AlignLeft className="size-5" />
+                  Description
+                </h3>
+                <Textarea
+                  aria-label="Description"
+                  value={issue.summary ?? ""}
+                  onChange={(event) => onChange(issue.id, { summary: event.target.value })}
+                  placeholder="Add a more detailed description..."
+                />
+              </section>
+
+              {checklists.map((list) => {
+                const done = list.items.filter((item) => item.done).length;
+                const progress = list.items.length ? Math.round((done / list.items.length) * 100) : 0;
+                const hidden = hideChecked[list.id] ?? false;
+
+                return (
+                  <section key={list.id} className="grid gap-3">
+                    <div className="flex items-center gap-3">
+                      <CheckSquare className="size-5 shrink-0" />
+                      <Input
+                        aria-label="Checklist title"
+                        className="h-8 flex-1 border-transparent bg-transparent px-1 font-semibold shadow-none focus-visible:border-input"
+                        value={list.title}
+                        onChange={(event) => patchChecklist(list.id, { title: event.target.value })}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setHideChecked((current) => ({ ...current, [list.id]: !hidden }))}
+                      >
+                        {hidden ? `Show checked items (${done})` : "Hide checked items"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setChecklists(checklists.filter((item) => item.id !== list.id))}
+                      >
+                        Delete
+                      </Button>
                     </div>
-                    {editingCommentId === comment.id ? (
-                      <div className="mt-2 grid gap-2">
-                        <Textarea value={editingCommentText} onChange={(event) => setEditingCommentText(event.target.value)} />
+
+                    <div className="flex items-center gap-3">
+                      <span className="w-10 text-xs text-muted-foreground">{progress}%</span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn("h-full transition-all", progress === 100 ? "bg-emerald-500" : "bg-primary")}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <ul className="grid gap-1">
+                      {list.items
+                        .filter((item) => !(hidden && item.done))
+                        .map((item) => (
+                          <li key={item.id} className="flex items-center gap-3 rounded-md px-1 py-1 hover:bg-muted/50">
+                            <input
+                              type="checkbox"
+                              className="size-4 accent-primary"
+                              checked={item.done}
+                              onChange={(event) =>
+                                patchChecklist(list.id, {
+                                  items: list.items.map((task) =>
+                                    task.id === item.id ? { ...task, done: event.target.checked } : task
+                                  ),
+                                })
+                              }
+                            />
+                            <Input
+                              aria-label="Task text"
+                              className={cn(
+                                "h-8 flex-1 border-transparent bg-transparent px-1 shadow-none focus-visible:border-input",
+                                item.done && "text-muted-foreground line-through"
+                              )}
+                              value={item.text}
+                              onChange={(event) =>
+                                patchChecklist(list.id, {
+                                  items: list.items.map((task) =>
+                                    task.id === item.id ? { ...task, text: event.target.value } : task
+                                  ),
+                                })
+                              }
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Delete ${item.text}`}
+                              onClick={() =>
+                                patchChecklist(list.id, { items: list.items.filter((task) => task.id !== item.id) })
+                              }
+                            >
+                              <Trash2 />
+                            </Button>
+                          </li>
+                        ))}
+                    </ul>
+
+                    {addingItemTo === list.id ? (
+                      <div className="space-y-2 pl-8">
+                        <Input
+                          autoFocus
+                          value={itemDrafts[list.id] ?? ""}
+                          onChange={(event) => setItemDrafts((current) => ({ ...current, [list.id]: event.target.value }))}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") addItem(list.id);
+                            if (event.key === "Escape") setAddingItemTo(null);
+                          }}
+                          placeholder="Add an item"
+                        />
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              const text = editingCommentText.trim();
-                              if (!text) return;
-                              onChange(issue.id, {
-                                comments: comments.map((item) => (item.id === comment.id ? { ...item, text } : item)),
-                              });
-                              setEditingCommentId(null);
-                            }}
-                          >
-                            Save
+                          <Button size="sm" onClick={() => addItem(list.id)}>
+                            Add
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingCommentId(null)}>
+                          <Button size="sm" variant="ghost" onClick={() => setAddingItemTo(null)}>
                             Cancel
                           </Button>
                         </div>
                       </div>
                     ) : (
-                      <>
-                        <p className="mt-1 text-sm leading-6">{comment.text}</p>
-                        <div className="mt-2 flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            onClick={() => {
-                              setEditingCommentId(comment.id);
-                              setEditingCommentText(comment.text);
-                            }}
-                          >
-                            <Pencil />
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            onClick={() => onChange(issue.id, { comments: comments.filter((item) => item.id !== comment.id) })}
-                          >
-                            <Trash2 />
-                            Delete
-                          </Button>
-                        </div>
-                      </>
+                      <div className="pl-8">
+                        <Button variant="outline" size="sm" onClick={() => setAddingItemTo(list.id)}>
+                          Add an item
+                        </Button>
+                      </div>
                     )}
-                  </li>
-                ))}
-              </ul>
+                  </section>
+                );
+              })}
+
+              <div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    if (window.confirm(`Hapus card ${issue.id}?`)) onDelete(issue.id);
+                  }}
+                >
+                  <Trash2 />
+                  Delete card
+                </Button>
+              </div>
             </div>
 
-            <DialogFooter showCloseButton>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (window.confirm(`Hapus card ${issue.id}?`)) onDelete(issue.id);
-                }}
-              >
-                <Trash2 />
-                Delete card
-              </Button>
-            </DialogFooter>
-          </>
+            <aside className="space-y-4 border-t bg-muted/30 p-6 md:max-h-[92vh] md:overflow-y-auto md:border-t-0 md:border-l">
+              <div className="flex items-center justify-between gap-2 pr-8">
+                <h3 className="flex items-center gap-2 font-semibold">
+                  <MessageSquare className="size-5" />
+                  Comments and activity
+                </h3>
+                <Button variant="outline" size="sm" onClick={() => setShowDetails((current) => !current)}>
+                  {showDetails ? "Hide details" : "Show details"}
+                </Button>
+              </div>
+
+              <div className="grid gap-2">
+                <Input
+                  value={commentText}
+                  onChange={(event) => setCommentText(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && addComment()}
+                  placeholder="Write a comment..."
+                />
+                {commentText.trim() ? (
+                  <div>
+                    <Button size="sm" onClick={addComment}>
+                      Save
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+
+              <ul className="grid gap-4">
+                {[...comments].reverse().map((comment) => (
+                  <li key={comment.id} className="flex gap-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                      {initials(comment.author)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm">
+                        <span className="font-semibold">{comment.author}</span>{" "}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(comment.createdAt).toLocaleString("id-ID")}
+                        </span>
+                      </p>
+                      {editingCommentId === comment.id ? (
+                        <div className="mt-1 grid gap-2">
+                          <Textarea
+                            value={editingCommentText}
+                            onChange={(event) => setEditingCommentText(event.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                const text = editingCommentText.trim();
+                                if (!text) return;
+                                onChange(issue.id, {
+                                  comments: comments.map((item) => (item.id === comment.id ? { ...item, text } : item)),
+                                });
+                                setEditingCommentId(null);
+                              }}
+                            >
+                              Save
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setEditingCommentId(null)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="mt-1 whitespace-pre-wrap rounded-lg border bg-background px-3 py-2 text-sm">
+                            {comment.text}
+                          </p>
+                          <div className="mt-1 flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => {
+                                setEditingCommentId(comment.id);
+                                setEditingCommentText(comment.text);
+                              }}
+                            >
+                              <Pencil />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() =>
+                                onChange(issue.id, { comments: comments.filter((item) => item.id !== comment.id) })
+                              }
+                            >
+                              <Trash2 />
+                              Delete
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                ))}
+
+                {showDetails ? (
+                  <li className="flex gap-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                      {initials(issue.assignee === "Unassigned" ? CURRENT_AUTHOR : issue.assignee)}
+                    </span>
+                    <div>
+                      <p className="text-sm">
+                        <span className="font-semibold">
+                          {issue.assignee === "Unassigned" ? CURRENT_AUTHOR : issue.assignee}
+                        </span>{" "}
+                        added this card to {issue.status}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{issue.createdAt}</p>
+                    </div>
+                  </li>
+                ) : null}
+              </ul>
+            </aside>
+          </div>
         ) : null}
       </DialogContent>
     </Dialog>
@@ -527,7 +707,16 @@ export function KanbanBoard() {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setIssues(JSON.parse(raw) as IssueRecord[]);
+      if (raw) {
+        const stored = JSON.parse(raw) as (IssueRecord & { checklist?: { id: string; text: string; done: boolean }[] })[];
+        setIssues(
+          stored.map(({ checklist, ...issue }) =>
+            checklist?.length && !issue.checklists?.length
+              ? { ...issue, checklists: [{ id: newId("list"), title: "Checklist", items: checklist }] }
+              : issue
+          )
+        );
+      }
     } catch {
       // ignore unreadable storage and keep seed data
     }
@@ -581,7 +770,7 @@ export function KanbanBoard() {
         assignee: "Unassigned",
         label: "None",
         createdAt: new Date().toISOString().slice(0, 10),
-        checklist: [],
+        checklists: [],
         comments: [],
       },
     ]);

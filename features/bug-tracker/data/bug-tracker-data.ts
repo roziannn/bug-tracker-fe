@@ -11,7 +11,8 @@ export type IssueRecord = {
   label: string | "None";
   createdAt: string;
   summary?: string;
-  checklist?: { id: string; text: string; done: boolean }[];
+  dueDate?: string;
+  checklists?: { id: string; title: string; items: { id: string; text: string; done: boolean }[] }[];
   comments?: {
     id: string;
     author: string;
