@@ -119,7 +119,14 @@ function IssueCard({
         <div className="flex items-start justify-between gap-2">
           <div>
             <CardTitle className="flex items-center gap-1.5 text-sm">
-              {issue.completed ? <Check className="size-4 text-emerald-500" strokeWidth={3} /> : null}
+              {issue.completed ? (
+                <span
+                  aria-label="Completed"
+                  className="flex size-6 shrink-0 items-center justify-center rounded-full bg-lime-500 text-zinc-900"
+                >
+                  <Check className="size-3.5" strokeWidth={3.5} />
+                </span>
+              ) : null}
               {issue.id}
               {issue.archived ? <span className="text-xs font-normal text-muted-foreground">Archived</span> : null}
               {issue.inactive ? <span className="text-xs font-normal text-muted-foreground">Inactive</span> : null}
