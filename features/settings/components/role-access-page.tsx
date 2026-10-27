@@ -6,7 +6,8 @@ import { ArrowLeft, Save } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { defaultMenus, type MenuNode } from "@/features/settings/data/access-catalog";
 import { loadMenus, orderMenus } from "@/features/settings/data/menu-store";
 import { defaultRoles, loadRoles, saveRoles, type RoleAccess } from "@/features/settings/data/role-access-store";
@@ -81,51 +82,74 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
           </Card>
         ) : null}
 
-        {role
-          ? orderMenus(menus).map(({ menu, depth }) => {
-              const menuEnabled = role.menus.includes(menu.id);
+        {role ? (
+          <Card>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Menu Name</TableHead>
+                    <TableHead>Parent Menu</TableHead>
+                    <TableHead>Sequence</TableHead>
+                    <TableHead>Function Buttons</TableHead>
+                    <TableHead className="text-right">Menu Access</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orderMenus(menus).map(({ menu, depth }) => {
+                    const menuEnabled = role.menus.includes(menu.id);
+                    const parent = menus.find((item) => item.id === menu.parentId);
+                    const sequence = menus.filter((item) => item.parentId === menu.parentId).indexOf(menu) + 1;
 
-              return (
-                <Card key={menu.id} className={depth ? "ml-6 sm:ml-10" : undefined}>
-                  <CardHeader>
-                    <label className="flex cursor-pointer items-start gap-3">
-                      <input
-                        type="checkbox"
-                        className="mt-1 size-4 accent-primary"
-                        checked={menuEnabled}
-                        onChange={(event) => setMenu(menu.id, event.target.checked)}
-                      />
-                      <span>
-                        <CardTitle>{menu.label}</CardTitle>
-                        <CardDescription>
-                          {menuEnabled ? "Menu aktif untuk role ini." : "Menu disembunyikan dari role ini."}
-                        </CardDescription>
-                      </span>
-                    </label>
-                  </CardHeader>
-                  {menu.actions.length ? (
-                    <CardContent className="grid gap-3 sm:grid-cols-2">
-                      {menu.actions.map((action) => (
-                        <label
-                          key={action.id}
-                          className={`flex items-center gap-2 text-sm ${menuEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}
-                        >
-                          <input
-                            type="checkbox"
-                            className="size-4 accent-primary"
-                            disabled={!menuEnabled}
-                            checked={menuEnabled && role.actions.includes(action.id)}
-                            onChange={(event) => setAction(action.id, event.target.checked)}
-                          />
-                          {action.label}
-                        </label>
-                      ))}
-                    </CardContent>
-                  ) : null}
-                </Card>
-              );
-            })
-          : null}
+                    return (
+                      <TableRow key={menu.id}>
+                        <TableCell className={depth ? "pl-10" : undefined}>{menu.label}</TableCell>
+                        <TableCell className="text-muted-foreground">{parent?.label ?? "-"}</TableCell>
+                        <TableCell>{sequence}</TableCell>
+                        <TableCell>
+                          {menu.actions.length ? (
+                            <div className="flex flex-wrap gap-2">
+                              {menu.actions.map((action) => (
+                                <label
+                                  key={action.id}
+                                  className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
+                                    menuEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="size-4 accent-primary"
+                                    disabled={!menuEnabled}
+                                    checked={menuEnabled && role.actions.includes(action.id)}
+                                    onChange={(event) => setAction(action.id, event.target.checked)}
+                                  />
+                                  {action.label}
+                                </label>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No buttons</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <label className="flex cursor-pointer items-center justify-end gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              className="size-4 accent-primary"
+                              checked={menuEnabled}
+                              onChange={(event) => setMenu(menu.id, event.target.checked)}
+                            />
+                            {menuEnabled ? "Enabled" : "Disabled"}
+                          </label>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </AppShell>
   );
