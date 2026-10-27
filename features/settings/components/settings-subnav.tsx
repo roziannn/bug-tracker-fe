@@ -7,8 +7,7 @@ import { cn } from "@/lib/utils";
 
 const settingsLinks = [
   { href: "/settings/role", label: "Role" },
-  { href: "/settings/menu", label: "Menu" },
-  { href: "/settings/permission", label: "Permission" },
+  { href: "/settings/environment", label: "Environment" },
 ] as const;
 
 export function SettingsSubnav() {

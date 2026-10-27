@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { PermissionSettingsPage } from "@/features/settings/components/permission-settings-page";
+import { RoleSettingsPage } from "@/features/settings/components/role-settings-page";
 
 export const metadata: Metadata = {
   title: "Role Settings",
 };
 
 export default function SettingsRolePage() {
-  return <PermissionSettingsPage mode="role" />;
+  return <RoleSettingsPage />;
 }
