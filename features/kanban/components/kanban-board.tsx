@@ -527,14 +527,12 @@ function IssueDetailDialog({
   issue,
   onClose,
   onChange,
-  onDelete,
   members,
 }: {
   issue: IssueRecord | null;
   members: string[];
   onClose: () => void;
   onChange: (issueId: string, patch: Partial<IssueRecord>) => void;
-  onDelete: (issueId: string) => void;
 }) {
   const [panel, setPanel] = useState<DetailPanel>(null);
   const [memberQuery, setMemberQuery] = useState("");
@@ -849,18 +847,6 @@ function IssueDetailDialog({
                 );
               })}
 
-              <div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    if (window.confirm(`Hapus card ${issue.id}?`)) onDelete(issue.id);
-                  }}
-                >
-                  <Trash2 />
-                  Delete card
-                </Button>
-              </div>
             </div>
 
             <aside className="min-h-[28rem] space-y-4 border-t bg-muted/30 p-6 md:h-full md:overflow-y-auto md:border-t-0 md:border-l">
@@ -1064,11 +1050,6 @@ export function KanbanBoard() {
     setIssues((current) => current.map((issue) => (issue.id === issueId ? { ...issue, ...patch } : issue)));
   }
 
-  function deleteIssue(issueId: string) {
-    setIssues((current) => current.filter((issue) => issue.id !== issueId));
-    setSelectedId(null);
-  }
-
   function addCard(status: IssueStatus, title: string) {
     setIssues((current) => [
       ...current,
@@ -1181,7 +1162,6 @@ export function KanbanBoard() {
         members={members}
         onClose={() => setSelectedId(null)}
         onChange={updateIssue}
-        onDelete={deleteIssue}
       />
     </AppShell>
   );
