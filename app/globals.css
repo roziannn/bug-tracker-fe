@@ -4,29 +4,35 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme {
-  --animate-complete-pop: complete-pop 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  --animate-complete-ray: complete-ray 550ms ease-out forwards;
-
-  @keyframes complete-pop {
-    0% {
-      transform: scale(0.6);
-    }
-    100% {
-      transform: scale(1);
-    }
+@keyframes complete-pop {
+  0% {
+    transform: scale(0.6);
   }
-
-  @keyframes complete-ray {
-    0% {
-      opacity: 1;
-      transform: rotate(var(--ray-angle)) translateY(-14px) scaleY(0.6);
-    }
-    100% {
-      opacity: 0;
-      transform: rotate(var(--ray-angle)) translateY(-24px) scaleY(1);
-    }
+  100% {
+    transform: scale(1);
   }
+}
+
+@keyframes complete-ray {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--ray-angle)) translateY(-14px) scaleY(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--ray-angle)) translateY(-24px) scaleY(1);
+  }
+}
+
+.animate-complete-pop {
+  animation: complete-pop 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Rays stay invisible and outside the circle unless the animation runs. */
+.animate-complete-ray {
+  opacity: 0;
+  transform: rotate(var(--ray-angle)) translateY(-24px);
+  animation: complete-ray 550ms ease-out forwards;
 }
 
 @theme inline {
