@@ -111,7 +111,7 @@ function IssueCard({
       onDragStart={() => onDragStart(issue.id)}
       onDragEnd={onDragEnd}
       className={cn(
-        "cursor-grab border-border/80 bg-card/95 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing",
+        "cursor-grab border border-foreground/15 bg-background shadow-md transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg active:cursor-grabbing",
         dragging && "opacity-55 ring-2 ring-primary/30"
       )}
     >
@@ -129,14 +129,7 @@ function IssueCard({
           <GripVertical className="mt-0.5 size-4 text-muted-foreground" />
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={priorityVariant(issue.priority)}>{issue.priority}</Badge>
-          <Badge variant="outline">{issue.team}</Badge>
-        </div>
-        {issue.summary ? (
-          <p className="text-sm leading-6 text-muted-foreground">{issue.summary}</p>
-        ) : null}
+      <CardContent className="space-y-3 empty:hidden">
         {items.length || commentCount ? (
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {items.length ? (
@@ -204,7 +197,7 @@ function KanbanColumnView({
   return (
     <Card
       className={cn(
-        "relative flex h-full min-h-[32rem] flex-col border border-border/80 bg-muted/20 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/80 before:content-['']",
+        "relative flex h-full min-h-[32rem] flex-col border border-border/80 bg-muted before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/80 before:content-['']",
         isOver && "border-primary bg-primary/5 before:bg-primary shadow-sm"
       )}
       onDragOver={(event) => {
