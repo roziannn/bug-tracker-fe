@@ -110,7 +110,7 @@ function IssueCard({
       onDragStart={() => onDragStart(issue.id)}
       onDragEnd={onDragEnd}
       className={cn(
-        "cursor-grab border border-foreground/15 bg-background shadow-md transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg active:cursor-grabbing",
+        "cursor-grab border border-foreground/15 bg-card dark:bg-zinc-800 shadow-md transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg active:cursor-grabbing",
         dragging && "opacity-55 ring-2 ring-primary/30"
       )}
     >
@@ -196,7 +196,7 @@ function KanbanColumnView({
   return (
     <Card
       className={cn(
-        "relative flex h-full min-h-[32rem] flex-col border border-border/80 bg-muted before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/80 before:content-['']",
+        "relative flex h-full min-h-[32rem] flex-col border border-border/80 bg-muted dark:bg-black/40 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/80 before:content-['']",
         isOver && "border-primary bg-primary/5 before:bg-primary shadow-sm"
       )}
       onDragOver={(event) => {
