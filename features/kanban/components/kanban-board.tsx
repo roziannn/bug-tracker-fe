@@ -595,7 +595,7 @@ function IssueDetailDialog({
     <Dialog open={issue !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="h-[92vh] max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-5xl">
         {issue ? (
-          <div className="grid h-full grid-rows-[auto] overflow-y-auto md:grid-cols-[minmax(0,1fr)_22rem] md:grid-rows-1 md:overflow-hidden">
+          <div className="grid h-full grid-rows-[auto] overflow-y-auto md:grid-cols-[minmax(0,1fr)_26rem] md:grid-rows-1 md:overflow-hidden">
             <div className="space-y-6 p-6 md:h-full md:overflow-y-auto">
               <DialogHeader className="space-y-1">
                 <DialogDescription>
@@ -865,7 +865,7 @@ function IssueDetailDialog({
 
             <aside className="min-h-[28rem] space-y-4 border-t bg-muted/30 p-6 md:h-full md:overflow-y-auto md:border-t-0 md:border-l">
               <div className="flex items-center justify-between gap-2 pr-8">
-                <h3 className="flex items-center gap-2 font-semibold">
+                <h3 className="flex items-center gap-2 font-semibold whitespace-nowrap">
                   <MessageSquare className="size-5" />
                   Comments and activity
                 </h3>
