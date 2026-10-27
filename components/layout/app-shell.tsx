@@ -80,6 +80,7 @@ const navigation: readonly NavigationItem[] = [
     icon: Settings,
     children: [
       { id: "role", label: "Role", href: "/settings/role" },
+      { id: "menu", label: "Menu", href: "/settings/menu" },
       { id: "environment", label: "Environment", href: "/settings/environment" },
     ],
   },

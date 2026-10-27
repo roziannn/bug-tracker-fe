@@ -20,7 +20,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
-import { SettingsSubnav } from "@/features/settings/components/settings-subnav";
 
 type EnvironmentRow = {
   name: string;
@@ -140,7 +139,6 @@ export function EnvironmentSettingsPage() {
               Edit environment app, endpoint API, database profile, dan status koneksi langsung dari tabel.
             </p>
           </div>
-          <SettingsSubnav />
         </div>
       }
     >

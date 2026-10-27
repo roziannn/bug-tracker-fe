@@ -7,9 +7,9 @@ import { ArrowLeft, Save } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { accessCatalog } from "@/features/settings/data/access-catalog";
+import { defaultMenus, type MenuNode } from "@/features/settings/data/access-catalog";
+import { loadMenus, orderMenus } from "@/features/settings/data/menu-store";
 import { defaultRoles, loadRoles, saveRoles, type RoleAccess } from "@/features/settings/data/role-access-store";
-import { SettingsSubnav } from "@/features/settings/components/settings-subnav";
 
 function toggle(list: string[], id: string, enabled: boolean) {
   return enabled ? [...list.filter((item) => item !== id), id] : list.filter((item) => item !== id);
@@ -18,9 +18,11 @@ function toggle(list: string[], id: string, enabled: boolean) {
 export function RoleAccessPage({ roleName }: { roleName: string }) {
   const [role, setRole] = useState<RoleAccess | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [menus, setMenus] = useState<MenuNode[]>(defaultMenus);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    setMenus(loadMenus());
     const found = loadRoles().find((item) => item.name === roleName) ?? defaultRoles.find((item) => item.name === roleName);
     setRole(found ?? null);
     setNotFound(!found);
@@ -55,7 +57,6 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
             <h2 className="text-lg font-semibold tracking-tight">Access: {roleName}</h2>
             <p className="text-sm text-muted-foreground">Aktifkan menu, lalu pilih button yang boleh dipakai role ini.</p>
           </div>
-          <SettingsSubnav />
         </div>
       }
     >
@@ -81,11 +82,11 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
         ) : null}
 
         {role
-          ? accessCatalog.map((menu) => {
+          ? orderMenus(menus).map(({ menu, depth }) => {
               const menuEnabled = role.menus.includes(menu.id);
 
               return (
-                <Card key={menu.id}>
+                <Card key={menu.id} className={depth ? "ml-6 sm:ml-10" : undefined}>
                   <CardHeader>
                     <label className="flex cursor-pointer items-start gap-3">
                       <input

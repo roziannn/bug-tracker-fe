@@ -1,4 +1,4 @@
-import { accessCatalog } from "@/features/settings/data/access-catalog";
+import { defaultMenus } from "@/features/settings/data/access-catalog";
 
 export type RoleAccess = {
   name: string;
@@ -8,8 +8,8 @@ export type RoleAccess = {
 
 const STORAGE_KEY = "bug-tracker:role-access";
 
-const allMenus = accessCatalog.map((menu) => menu.id);
-const allActions = accessCatalog.flatMap((menu) => menu.actions.map((action) => action.id));
+const allMenus = defaultMenus.map((menu) => menu.id);
+const allActions = defaultMenus.flatMap((menu) => menu.actions.map((action) => action.id));
 
 export const defaultRoles: RoleAccess[] = [
   { name: "Admin", menus: allMenus, actions: allActions },

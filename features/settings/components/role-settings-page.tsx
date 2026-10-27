@@ -19,18 +19,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
-import { accessCatalog } from "@/features/settings/data/access-catalog";
+import { defaultMenus, type MenuNode } from "@/features/settings/data/access-catalog";
+import { loadMenus } from "@/features/settings/data/menu-store";
 import { defaultRoles, loadRoles, saveRoles, type RoleAccess } from "@/features/settings/data/role-access-store";
-import { SettingsSubnav } from "@/features/settings/components/settings-subnav";
 
 const PAGE_SIZE = 5;
-const totalActions = accessCatalog.reduce((sum, menu) => sum + menu.actions.length, 0);
 
 export function RoleSettingsPage() {
   const [roles, setRoles] = useState<RoleAccess[]>(defaultRoles);
+  const [menus, setMenus] = useState<MenuNode[]>(defaultMenus);
   const [page, setPage] = useState(1);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [roleName, setRoleName] = useState("");
+  const totalActions = menus.reduce((sum, menu) => sum + menu.actions.length, 0);
   const totalPages = Math.max(1, Math.ceil(roles.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginatedRoles = useMemo(
@@ -40,6 +41,7 @@ export function RoleSettingsPage() {
 
   useEffect(() => {
     setRoles(loadRoles());
+    setMenus(loadMenus());
   }, []);
 
   function createRole() {
@@ -69,7 +71,6 @@ export function RoleSettingsPage() {
               Kelola role, lalu atur menu dan button yang aktif lewat halaman access masing-masing role.
             </p>
           </div>
-          <SettingsSubnav />
         </div>
       }
     >
@@ -127,10 +128,10 @@ export function RoleSettingsPage() {
                 <TableRow key={role.name}>
                   <TableCell className="font-medium">{role.name}</TableCell>
                   <TableCell>
-                    {role.menus.length} / {accessCatalog.length}
+                    {role.menus.filter((id) => menus.some((menu) => menu.id === id)).length} / {menus.length}
                   </TableCell>
                   <TableCell>
-                    {role.actions.length} / {totalActions}
+                    {role.actions.filter((id) => menus.some((menu) => menu.actions.some((action) => action.id === id))).length} / {totalActions}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

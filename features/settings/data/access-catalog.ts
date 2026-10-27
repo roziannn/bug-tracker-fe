@@ -1,10 +1,11 @@
-export type AccessMenu = {
+export type MenuNode = {
   id: string;
   label: string;
+  parentId: string | null;
   actions: { id: string; label: string }[];
 };
 
-export const accessCatalog: AccessMenu[] = [
+const rootMenus = [
   { id: "overview", label: "Overview", actions: [] },
   {
     id: "issues",
@@ -42,4 +43,10 @@ export const accessCatalog: AccessMenu[] = [
       { id: "settings.manage-environment", label: "Manage environment" },
     ],
   },
-];
+] as const;
+
+export const defaultMenus: MenuNode[] = rootMenus.map((menu) => ({
+  ...menu,
+  parentId: null,
+  actions: [...menu.actions],
+}));
