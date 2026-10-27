@@ -24,7 +24,6 @@ import { cn } from "@/lib/utils";
 import {
   issues as initialIssues,
   kanbanColumns,
-  priorityVariant,
   projectOptions,
   type IssueRecord,
   type IssueStatus,
