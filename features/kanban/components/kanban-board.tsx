@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { GripVertical, ListFilter, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CheckSquare, GripVertical, ListFilter, MessageSquare, Plus, Search, Trash2, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
@@ -26,6 +27,13 @@ import {
   type IssueRecord,
   type IssueStatus,
 } from "@/features/bug-tracker/data/bug-tracker-data";
+
+const STORAGE_KEY = "bug-tracker:kanban-issues";
+const CURRENT_AUTHOR = "You";
+
+function newId(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+}
 
 type DragState = {
   issueId: string | null;
@@ -82,15 +90,22 @@ function IssueCard({
   dragging,
   onDragStart,
   onDragEnd,
+  onOpen,
 }: {
   issue: IssueRecord;
   dragging: boolean;
   onDragStart: (issueId: string) => void;
   onDragEnd: () => void;
+  onOpen: (issueId: string) => void;
 }) {
+  const checklist = issue.checklist ?? [];
+  const doneCount = checklist.filter((item) => item.done).length;
+  const commentCount = issue.comments?.length ?? 0;
+
   return (
     <Card
       draggable
+      onClick={() => onOpen(issue.id)}
       onDragStart={() => onDragStart(issue.id)}
       onDragEnd={onDragEnd}
       className={cn(
@@ -117,6 +132,27 @@ function IssueCard({
         {issue.summary ? (
           <p className="text-sm leading-6 text-muted-foreground">{issue.summary}</p>
         ) : null}
+        {checklist.length || commentCount ? (
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            {checklist.length ? (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1",
+                  doneCount === checklist.length && "text-emerald-600 dark:text-emerald-400"
+                )}
+              >
+                <CheckSquare className="size-3.5" />
+                {doneCount}/{checklist.length}
+              </span>
+            ) : null}
+            {commentCount ? (
+              <span className="inline-flex items-center gap-1">
+                <MessageSquare className="size-3.5" />
+                {commentCount}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -133,6 +169,8 @@ function KanbanColumnView({
   onDragEnd,
   onDragOver,
   onDrop,
+  onOpen,
+  onAddCard,
 }: {
   id: IssueStatus;
   title: string;
@@ -144,7 +182,20 @@ function KanbanColumnView({
   onDragEnd: () => void;
   onDragOver: (column: IssueStatus) => void;
   onDrop: (column: IssueStatus) => void;
+  onOpen: (issueId: string) => void;
+  onAddCard: (column: IssueStatus, title: string) => void;
 }) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+
+  function submitCard() {
+    const title = draftTitle.trim();
+    if (!title) return;
+
+    onAddCard(id, title);
+    setDraftTitle("");
+  }
+
   return (
     <Card
       className={cn(
@@ -178,6 +229,7 @@ function KanbanColumnView({
               issue={issue}
               onDragEnd={onDragEnd}
               onDragStart={onDragStart}
+              onOpen={onOpen}
             />
           ))
         ) : (
@@ -185,8 +237,206 @@ function KanbanColumnView({
             Drop bug cards here.
           </div>
         )}
+
+        {isAdding ? (
+          <div className="space-y-2">
+            <Input
+              autoFocus
+              value={draftTitle}
+              onChange={(event) => setDraftTitle(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") submitCard();
+                if (event.key === "Escape") setIsAdding(false);
+              }}
+              placeholder="Judul card..."
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={submitCard}>
+                Add card
+              </Button>
+              <Button size="icon-sm" variant="ghost" aria-label="Cancel" onClick={() => setIsAdding(false)}>
+                <X />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="ghost" className="justify-start text-muted-foreground" onClick={() => setIsAdding(true)}>
+            <Plus />
+            Add a card
+          </Button>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function IssueDetailDialog({
+  issue,
+  onClose,
+  onChange,
+}: {
+  issue: IssueRecord | null;
+  onClose: () => void;
+  onChange: (issueId: string, patch: Partial<IssueRecord>) => void;
+}) {
+  const [taskText, setTaskText] = useState("");
+  const [commentText, setCommentText] = useState("");
+  const checklist = issue?.checklist ?? [];
+  const comments = issue?.comments ?? [];
+  const doneCount = checklist.filter((item) => item.done).length;
+  const progress = checklist.length ? Math.round((doneCount / checklist.length) * 100) : 0;
+
+  function addTask() {
+    const text = taskText.trim();
+    if (!issue || !text) return;
+
+    onChange(issue.id, { checklist: [...checklist, { id: newId("task"), text, done: false }] });
+    setTaskText("");
+  }
+
+  function addComment() {
+    const text = commentText.trim();
+    if (!issue || !text) return;
+
+    onChange(issue.id, {
+      comments: [
+        ...comments,
+        { id: newId("comment"), author: CURRENT_AUTHOR, text, createdAt: new Date().toISOString() },
+      ],
+    });
+    setCommentText("");
+  }
+
+  return (
+    <Dialog open={issue !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        {issue ? (
+          <>
+            <DialogHeader>
+              <DialogDescription>{issue.id}</DialogDescription>
+              <DialogTitle>
+                <Input
+                  aria-label="Card title"
+                  className="h-9 text-base font-semibold"
+                  value={issue.title}
+                  onChange={(event) => onChange(issue.id, { title: event.target.value })}
+                />
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={issue.status} onValueChange={(value) => value && onChange(issue.id, { status: value as IssueStatus })}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {kanbanColumns.map((column) => (
+                    <SelectItem key={column.id} value={column.id}>
+                      {column.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Badge variant={priorityVariant(issue.priority)}>{issue.priority}</Badge>
+              <Badge variant="outline">{issue.team}</Badge>
+            </div>
+
+            <div className="grid gap-2">
+              <label htmlFor="card-description" className="text-sm font-medium">
+                Description
+              </label>
+              <Textarea
+                id="card-description"
+                value={issue.summary ?? ""}
+                onChange={(event) => onChange(issue.id, { summary: event.target.value })}
+                placeholder="Tambahkan deskripsi..."
+              />
+            </div>
+
+            <div className="grid gap-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Checklist</p>
+                {checklist.length ? (
+                  <span className="text-xs text-muted-foreground">
+                    {doneCount}/{checklist.length} · {progress}%
+                  </span>
+                ) : null}
+              </div>
+              {checklist.length ? (
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+                </div>
+              ) : null}
+              <ul className="grid gap-1">
+                {checklist.map((item) => (
+                  <li key={item.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/50">
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-primary"
+                      checked={item.done}
+                      onChange={(event) =>
+                        onChange(issue.id, {
+                          checklist: checklist.map((task) =>
+                            task.id === item.id ? { ...task, done: event.target.checked } : task
+                          ),
+                        })
+                      }
+                    />
+                    <span className={cn("flex-1 text-sm", item.done && "text-muted-foreground line-through")}>
+                      {item.text}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Delete ${item.text}`}
+                      onClick={() => onChange(issue.id, { checklist: checklist.filter((task) => task.id !== item.id) })}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <Input
+                  value={taskText}
+                  onChange={(event) => setTaskText(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && addTask()}
+                  placeholder="Tambah task..."
+                />
+                <Button variant="outline" onClick={addTask}>
+                  <Plus />
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              <p className="text-sm font-medium">Comments</p>
+              <div className="flex gap-2">
+                <Input
+                  value={commentText}
+                  onChange={(event) => setCommentText(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && addComment()}
+                  placeholder="Tulis comment..."
+                />
+                <Button onClick={addComment}>Send</Button>
+              </div>
+              <ul className="grid gap-2">
+                {[...comments].reverse().map((comment) => (
+                  <li key={comment.id} className="rounded-lg border bg-muted/30 p-3">
+                    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{comment.author}</span>
+                      <span>{new Date(comment.createdAt).toLocaleString("id-ID")}</span>
+                    </div>
+                    <p className="mt-1 text-sm leading-6">{comment.text}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -196,6 +446,27 @@ export function KanbanBoard() {
     issueId: null,
     overColumn: null,
   });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) setIssues(JSON.parse(raw) as IssueRecord[]);
+    } catch {
+      // ignore unreadable storage and keep seed data
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(issues));
+    } catch {
+      // storage unavailable; changes stay in memory only
+    }
+  }, [hydrated, issues]);
 
   const groupedIssues = useMemo(
     () =>
@@ -212,6 +483,28 @@ export function KanbanBoard() {
         issue.id === issueId ? { ...issue, status: nextStatus } : issue
       )
     );
+  }
+
+  function updateIssue(issueId: string, patch: Partial<IssueRecord>) {
+    setIssues((current) => current.map((issue) => (issue.id === issueId ? { ...issue, ...patch } : issue)));
+  }
+
+  function addCard(status: IssueStatus, title: string) {
+    setIssues((current) => [
+      ...current,
+      {
+        id: `KB-${Date.now().toString(36).toUpperCase()}`,
+        title,
+        priority: "Medium",
+        status,
+        team: "General",
+        assignee: "Unassigned",
+        label: "None",
+        createdAt: new Date().toISOString().slice(0, 10),
+        checklist: [],
+        comments: [],
+      },
+    ]);
   }
 
   return (
@@ -294,12 +587,20 @@ export function KanbanBoard() {
                   if (dragState.issueId) moveIssue(dragState.issueId, nextColumn);
                   setDragState({ issueId: null, overColumn: null });
                 }}
+                onOpen={setSelectedId}
+                onAddCard={addCard}
                 title={column.title}
               />
             ))}
           </div>
         </CardContent>
       </Card>
+
+      <IssueDetailDialog
+        issue={issues.find((issue) => issue.id === selectedId) ?? null}
+        onClose={() => setSelectedId(null)}
+        onChange={updateIssue}
+      />
     </AppShell>
   );
 }
