@@ -863,7 +863,7 @@ function IssueDetailDialog({
               </div>
             </div>
 
-            <aside className="space-y-4 border-t bg-muted/30 p-6 md:h-full md:overflow-y-auto md:border-t-0 md:border-l">
+            <aside className="min-h-[28rem] space-y-4 border-t bg-muted/30 p-6 md:h-full md:overflow-y-auto md:border-t-0 md:border-l">
               <div className="flex items-center justify-between gap-2 pr-8">
                 <h3 className="flex items-center gap-2 font-semibold">
                   <MessageSquare className="size-5" />
