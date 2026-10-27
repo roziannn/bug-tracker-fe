@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
@@ -117,7 +118,10 @@ function IssueCard({
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-sm">{issue.id}</CardTitle>
+            <CardTitle className="flex items-center gap-1.5 text-sm">
+              {issue.completed ? <Check className="size-4 text-emerald-500" strokeWidth={3} /> : null}
+              {issue.id}
+            </CardTitle>
             <CardDescription className="mt-1 leading-6 text-foreground/90">
               {issue.title}
             </CardDescription>
@@ -278,6 +282,53 @@ function initials(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function CompleteToggle({ completed, onToggle }: { completed: boolean; onToggle: () => void }) {
+  const [burstKey, setBurstKey] = useState(0);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            aria-pressed={completed}
+            aria-label={completed ? "Mark incomplete" : "Mark complete"}
+            className="relative flex size-9 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            onClick={() => {
+              if (!completed) setBurstKey((current) => current + 1);
+              onToggle();
+            }}
+          />
+        }
+      >
+        <span
+          key={completed ? "done" : "open"}
+          className={cn(
+            "flex size-6 items-center justify-center rounded-full border-2 transition-colors",
+            completed
+              ? "animate-complete-pop border-emerald-500 bg-emerald-500 text-white"
+              : "border-muted-foreground hover:border-foreground"
+          )}
+        >
+          {completed ? <Check className="size-4" strokeWidth={3} /> : null}
+        </span>
+        {completed && burstKey > 0 ? (
+          <span key={burstKey} aria-hidden className="pointer-events-none absolute inset-0">
+            {Array.from({ length: 8 }, (_, index) => (
+              <span
+                key={index}
+                className="animate-complete-ray absolute top-1/2 left-1/2 -mt-1 -ml-px h-2 w-0.5 rounded-full bg-emerald-400"
+                style={{ "--ray-angle": `${index * 45}deg` } as React.CSSProperties}
+              />
+            ))}
+          </span>
+        ) : null}
+      </TooltipTrigger>
+      <TooltipContent>{completed ? "Mark incomplete" : "Mark complete"}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 type DetailPanel = "dates" | "members" | "issues" | null;
@@ -609,12 +660,18 @@ function IssueDetailDialog({
                   {issue.id} · in list
                 </DialogDescription>
                 <DialogTitle className="sr-only">{issue.title}</DialogTitle>
-                <Input
-                  aria-label="Card title"
-                  className="h-auto border-transparent bg-transparent px-1 text-2xl font-semibold shadow-none focus-visible:border-input"
-                  value={issue.title}
-                  onChange={(event) => onChange(issue.id, { title: event.target.value })}
-                />
+                <div className="flex items-center gap-2">
+                  <CompleteToggle
+                    completed={Boolean(issue.completed)}
+                    onToggle={() => onChange(issue.id, { completed: !issue.completed })}
+                  />
+                  <Input
+                    aria-label="Card title"
+                    className="h-auto border-transparent bg-transparent px-1 text-2xl font-semibold shadow-none focus-visible:border-input"
+                    value={issue.title}
+                    onChange={(event) => onChange(issue.id, { title: event.target.value })}
+                  />
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Select
                     value={issue.project ?? "none"}
