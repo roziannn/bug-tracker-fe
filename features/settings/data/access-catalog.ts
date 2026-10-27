@@ -2,13 +2,16 @@ export type MenuNode = {
   id: string;
   label: string;
   parentId: string | null;
+  path: string;
+  icon: string;
+  visible: boolean;
   actions: { id: string; label: string }[];
 };
 
 const rootMenus = [
-  { id: "overview", label: "Overview", actions: [] },
+  { id: "overview", path: "/", icon: "Gauge", label: "Overview", actions: [] },
   {
-    id: "issues",
+    id: "issues", path: "/issues", icon: "CircleDot",
     label: "All Issues",
     actions: [
       { id: "issues.create", label: "Create issue" },
@@ -17,9 +20,9 @@ const rootMenus = [
       { id: "issues.export", label: "Export" },
     ],
   },
-  { id: "kanban", label: "Kanban", actions: [{ id: "kanban.move", label: "Move card" }] },
+  { id: "kanban", path: "/kanban", icon: "KanbanSquare", label: "Kanban", actions: [{ id: "kanban.move", label: "Move card" }] },
   {
-    id: "teams",
+    id: "teams", path: "/teams", icon: "Users",
     label: "Teams",
     actions: [
       { id: "teams.manage-groups", label: "Create / edit group" },
@@ -27,16 +30,16 @@ const rootMenus = [
     ],
   },
   {
-    id: "projects",
+    id: "projects", path: "/projects", icon: "FolderOpenDot",
     label: "Projects",
     actions: [
       { id: "projects.create", label: "Create project" },
       { id: "projects.export", label: "Export" },
     ],
   },
-  { id: "audit-trail", label: "Audit Trail", actions: [{ id: "audit-trail.export", label: "Export" }] },
+  { id: "audit-trail", path: "/audit-trail", icon: "FileSearch2", label: "Audit Trail", actions: [{ id: "audit-trail.export", label: "Export" }] },
   {
-    id: "settings",
+    id: "settings", path: "/settings/role", icon: "Settings",
     label: "Settings",
     actions: [
       { id: "settings.manage-roles", label: "Manage roles" },
@@ -48,5 +51,6 @@ const rootMenus = [
 export const defaultMenus: MenuNode[] = rootMenus.map((menu) => ({
   ...menu,
   parentId: null,
+  visible: true,
   actions: [...menu.actions],
 }));

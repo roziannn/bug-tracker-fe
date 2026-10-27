@@ -5,7 +5,14 @@ const STORAGE_KEY = "bug-tracker:menus";
 export function loadMenus(): MenuNode[] {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as MenuNode[]) : defaultMenus;
+    return raw
+      ? (JSON.parse(raw) as Partial<MenuNode>[]).map((menu) => ({
+          ...menu,
+          path: menu.path ?? "",
+          icon: menu.icon ?? "Circle",
+          visible: menu.visible ?? true,
+        })) as MenuNode[]
+      : defaultMenus;
   } catch {
     return defaultMenus;
   }
