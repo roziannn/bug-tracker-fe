@@ -11,10 +11,8 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -48,7 +46,7 @@ type DragState = {
   overColumn: IssueStatus | null;
 };
 
-function KanbanToolbar() {
+function KanbanToolbar({ showArchived, onToggleArchived }: { showArchived: boolean; onToggleArchived: () => void }) {
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -78,16 +76,10 @@ function KanbanToolbar() {
             <SelectItem value="frontend">Frontend only</SelectItem>
           </SelectContent>
         </Select>
-        <Select defaultValue="sprint-12">
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="sprint-12">Sprint 12</SelectItem>
-            <SelectItem value="hotfix">Hotfix lane</SelectItem>
-            <SelectItem value="backlog">Backlog review</SelectItem>
-          </SelectContent>
-        </Select>
+        <Button variant="outline" onClick={onToggleArchived}>
+          <Archive />
+          {showArchived ? "Hide archived" : "Show archived"}
+        </Button>
       </div>
     </div>
   );
@@ -1292,68 +1284,9 @@ export function KanbanBoard() {
       activeNav="kanban"
       eyebrow="Sprint workflow"
       title="Bug Triage Kanban"
-      toolbar={<KanbanToolbar />}
+      toolbar={<KanbanToolbar showArchived={showArchived} onToggleArchived={() => setShowArchived((current) => !current)} />}
     >
       <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl space-y-1">
-              <CardTitle>Kanban Board</CardTitle>
-              <CardDescription>
-                Drag and drop ringkasan alur triage, perpindahan status issue, dan distribusi beban kerja aktif dalam satu board.
-              </CardDescription>
-            </div>
-
-            <div className="flex shrink-0 flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setShowArchived((current) => !current)}>
-              <Archive />
-              {showArchived ? "Hide archived" : "Show archived"}
-            </Button>
-            <Dialog>
-              <DialogTrigger
-                render={
-                  <Button className="shrink-0" variant="outline">
-                    View board rules
-                  </Button>
-                }
-              />
-              <DialogContent className="sm:max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Kanban board rules</DialogTitle>
-                  <DialogDescription>
-                    Semua aturan utama buat triage flow, status movement, dan kondisi board saat ini.
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="grid gap-4">
-                  <div className="rounded-xl border bg-muted/30 p-4">
-                    <p className="font-medium">Triage SLA</p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      Critical issues should leave backlog within 2 hours. High priority issues should reach investigation on the same business day.
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border bg-muted/30 p-4">
-                    <p className="font-medium">Workflow hint</p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      Keep cards in ready only when reproduction steps, owner, and fix scope are clear enough for engineering pickup.
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border bg-muted/30 p-4">
-                    <p className="font-medium">Current board health</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Badge>2 critical in review</Badge>
-                      <Badge variant="secondary">3 waiting for QA</Badge>
-                      <Badge variant="outline">1 rollback verified</Badge>
-                    </div>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-            </div>
-          </div>
-        </CardHeader>
         <CardContent className="overflow-x-auto">
           <div className="grid min-w-[58rem] gap-4 xl:grid-cols-4">
             {groupedIssues.map((column) => (
