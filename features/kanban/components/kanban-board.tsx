@@ -122,9 +122,9 @@ function IssueCard({
               {issue.completed ? (
                 <span
                   aria-label="Completed"
-                  className="flex size-6 shrink-0 items-center justify-center rounded-full bg-lime-500 text-zinc-900"
+                  className="flex size-4 shrink-0 items-center justify-center rounded-full bg-lime-500 text-zinc-900"
                 >
-                  <Check className="size-3.5" strokeWidth={3.5} />
+                  <Check className="size-2.5" strokeWidth={3.5} />
                 </span>
               ) : null}
               {issue.id}
