@@ -92,6 +92,7 @@ const navigation: readonly NavigationItem[] = [
           { id: "project-status", label: "Project Status", href: "/settings/category/project-status" },
           { id: "issue-status", label: "Issue Status", href: "/settings/category/issue-status" },
           { id: "issue-priority", label: "Issue Priority", href: "/settings/category/issue-priority" },
+          { id: "audit-trail-outcome", label: "Audit Trail Outcome", href: "/settings/category/audit-trail-outcome" },
         ],
       },
     ],

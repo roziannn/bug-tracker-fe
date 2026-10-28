@@ -53,6 +53,16 @@ export const categoryConfigs: CategoryConfig[] = [
     description: "Tingkat prioritas yang bisa dipakai sebuah issue.",
     defaults: [item("Critical"), item("High"), item("Medium"), item("Low")],
   },
+  {
+    slug: "audit-trail-outcome",
+    title: "Audit Trail Outcome",
+    description: "Hasil sebuah aktivitas yang dicatat di audit trail.",
+    defaults: [
+      item("Success", "Aktivitas berhasil dijalankan."),
+      item("Warning", "Berhasil, tetapi perlu diperhatikan."),
+      item("Blocked", "Aktivitas ditolak atau diblokir."),
+    ],
+  },
 ];
 
 export function getCategoryConfig(slug: string) {
