@@ -50,7 +50,8 @@ type AppShellProps = {
 type NavigationChild = {
   id: string;
   label: string;
-  href: string;
+  href?: string;
+  children?: readonly { id: string; label: string; href: string }[];
 };
 
 type NavigationItem = {
@@ -83,6 +84,16 @@ const navigation: readonly NavigationItem[] = [
       { id: "users", label: "Users", href: "/settings/users" },
       { id: "menu", label: "Menu", href: "/settings/menu" },
       { id: "environment", label: "Environment", href: "/settings/environment" },
+      {
+        id: "category",
+        label: "Kategori",
+        children: [
+          { id: "teams-domain", label: "Teams Domain", href: "/settings/category/teams-domain" },
+          { id: "project-status", label: "Project Status", href: "/settings/category/project-status" },
+          { id: "issue-status", label: "Issue Status", href: "/settings/category/issue-status" },
+          { id: "issue-priority", label: "Issue Priority", href: "/settings/category/issue-priority" },
+        ],
+      },
     ],
   },
   { id: "audit-trail", label: "Audit Trail", href: "/audit-trail", icon: FileSearch2 },
@@ -106,6 +117,7 @@ export function AppShell({
   const pathname = usePathname();
   const resolvedBreadcrumbs = breadcrumbs?.length ? breadcrumbs : [{ label: title }];
   const [isSettingsOpen, setIsSettingsOpen] = useState(pathname.startsWith("/settings"));
+  const [isCategoryOpen, setIsCategoryOpen] = useState(pathname.startsWith("/settings/category"));
   const { user, clearUser } = useCurrentUser();
   useEffect(() => {
     if (pathname.startsWith("/settings")) {
@@ -158,7 +170,10 @@ export function AppShell({
                   const Icon = item.icon;
                   const isSettingsGroup = item.id === "settings-group";
                   const hasChildren = Boolean(item.children?.length);
-                  const isChildActive = item.children?.some((child) => pathname === child.href) ?? false;
+                  const isChildActive =
+                    item.children?.some(
+                      (child) => pathname === child.href || child.children?.some((grandchild) => pathname === grandchild.href)
+                    ) ?? false;
                   const isActive = isSettingsGroup ? isChildActive : item.id === activeNav;
 
                   return (
@@ -182,16 +197,44 @@ export function AppShell({
                           </SidebarMenuButton>
                           {isSettingsOpen ? (
                             <SidebarMenuSub>
-                              {item.children?.map((child) => (
-                                <SidebarMenuSubItem key={child.id}>
-                                  <SidebarMenuSubButton
-                                    isActive={pathname === child.href}
-                                    render={<Link href={child.href} />}
-                                  >
-                                    <span>{child.label}</span>
-                                  </SidebarMenuSubButton>
-                                </SidebarMenuSubItem>
-                              ))}
+                              {item.children?.map((child) =>
+                                child.children ? (
+                                  <SidebarMenuSubItem key={child.id}>
+                                    <SidebarMenuSubButton
+                                      render={<button type="button" />}
+                                      onClick={() => setIsCategoryOpen((current) => !current)}
+                                    >
+                                      <span>{child.label}</span>
+                                      <ChevronRight
+                                        className={cn("ml-auto size-3.5 transition-transform", isCategoryOpen && "rotate-90")}
+                                      />
+                                    </SidebarMenuSubButton>
+                                    {isCategoryOpen ? (
+                                      <SidebarMenuSub>
+                                        {child.children.map((grandchild) => (
+                                          <SidebarMenuSubItem key={grandchild.id}>
+                                            <SidebarMenuSubButton
+                                              isActive={pathname === grandchild.href}
+                                              render={<Link href={grandchild.href} />}
+                                            >
+                                              <span>{grandchild.label}</span>
+                                            </SidebarMenuSubButton>
+                                          </SidebarMenuSubItem>
+                                        ))}
+                                      </SidebarMenuSub>
+                                    ) : null}
+                                  </SidebarMenuSubItem>
+                                ) : (
+                                  <SidebarMenuSubItem key={child.id}>
+                                    <SidebarMenuSubButton
+                                      isActive={pathname === child.href}
+                                      render={<Link href={child.href ?? "#"} />}
+                                    >
+                                      <span>{child.label}</span>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                )
+                              )}
                             </SidebarMenuSub>
                           ) : null}
                         </>
