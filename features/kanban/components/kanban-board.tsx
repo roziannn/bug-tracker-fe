@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlignLeft, Archive, Ban, Check, FolderOpenDot, Link2, MoreHorizontal, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
+import { AlignLeft, Archive, ArrowDown, ArrowUp, Ban, Check, FolderOpenDot, Link2, MoreHorizontal, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -29,12 +29,14 @@ import { cn } from "@/lib/utils";
 import {
   issues as initialIssues,
   kanbanColumns,
+  type KanbanColumn,
   projectOptions,
   type IssueRecord,
   type IssueStatus,
 } from "@/features/bug-tracker/data/bug-tracker-data";
 
 const STORAGE_KEY = "bug-tracker:kanban-issues";
+const COLUMNS_STORAGE_KEY = "bug-tracker:kanban-columns";
 const CURRENT_AUTHOR = "You";
 
 function newId(prefix: string) {
@@ -46,7 +48,15 @@ type DragState = {
   overColumn: IssueStatus | null;
 };
 
-function KanbanToolbar({ showArchived, onToggleArchived }: { showArchived: boolean; onToggleArchived: () => void }) {
+function KanbanToolbar({
+  showArchived,
+  onToggleArchived,
+  onOpenListGroup,
+}: {
+  showArchived: boolean;
+  onToggleArchived: () => void;
+  onOpenListGroup: () => void;
+}) {
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -65,17 +75,10 @@ function KanbanToolbar({ showArchived, onToggleArchived }: { showArchived: boole
             placeholder="Search cards, assignees, teams, or bug ids..."
           />
         </div>
-        <Select defaultValue="critical-high">
-          <SelectTrigger>
-            <ListFilter />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="critical-high">Critical + High</SelectItem>
-            <SelectItem value="all">All priorities</SelectItem>
-            <SelectItem value="frontend">Frontend only</SelectItem>
-          </SelectContent>
-        </Select>
+        <Button variant="outline" onClick={onOpenListGroup}>
+          <ListFilter />
+          List Group
+        </Button>
         <Button variant="outline" onClick={onToggleArchived}>
           <Archive />
           {showArchived ? "Hide archived" : "Show archived"}
@@ -1199,7 +1202,20 @@ export function KanbanBoard() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [isListGroupOpen, setIsListGroupOpen] = useState(false);
+  const [columns, setColumns] = useState<KanbanColumn[]>(() =>
+    kanbanColumns.filter((column) => column.id !== "Backlog")
+  );
   const [userNames, setUserNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const storedColumns = window.localStorage.getItem(COLUMNS_STORAGE_KEY);
+      if (storedColumns) setColumns(JSON.parse(storedColumns) as KanbanColumn[]);
+    } catch {
+      // ignore unreadable storage and keep default lists
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -1249,12 +1265,36 @@ export function KanbanBoard() {
 
   const groupedIssues = useMemo(
     () =>
-      kanbanColumns.map((column) => ({
+      columns.map((column) => ({
         ...column,
         issues: issues.filter((issue) => issue.status === column.id && (showArchived || !issue.archived)),
-      })).filter((column) => column.id !== "Backlog"),
-    [issues, showArchived]
+      })),
+    [columns, issues, showArchived]
   );
+
+  function updateColumns(next: KanbanColumn[]) {
+    setColumns(next);
+    try {
+      window.localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // storage unavailable; changes stay in memory only
+    }
+  }
+
+  function addColumn() {
+    updateColumns([...columns, { id: newId("list"), title: "New list", description: "" }]);
+  }
+
+  function deleteColumn(columnId: string) {
+    const remaining = columns.filter((column) => column.id !== columnId);
+    if (!remaining.length) return;
+
+    // Cards of a deleted list move to the first remaining list instead of disappearing.
+    setIssues((current) =>
+      current.map((issue) => (issue.status === columnId ? { ...issue, status: remaining[0].id } : issue))
+    );
+    updateColumns(remaining);
+  }
 
   function moveIssue(issueId: string, nextStatus: IssueStatus) {
     setIssues((current) =>
@@ -1291,8 +1331,93 @@ export function KanbanBoard() {
       activeNav="kanban"
       eyebrow="Sprint workflow"
       title="Bug Triage Kanban"
-      toolbar={<KanbanToolbar showArchived={showArchived} onToggleArchived={() => setShowArchived((current) => !current)} />}
+      toolbar={
+        <KanbanToolbar
+          showArchived={showArchived}
+          onToggleArchived={() => setShowArchived((current) => !current)}
+          onOpenListGroup={() => setIsListGroupOpen(true)}
+        />
+      }
     >
+      <Dialog open={isListGroupOpen} onOpenChange={setIsListGroupOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>List Group</DialogTitle>
+            <DialogDescription>Atur nama dan deskripsi list di board, atau tambah list baru.</DialogDescription>
+          </DialogHeader>
+
+          <ul className="grid gap-3">
+            {columns.map((column, index) => (
+              <li key={column.id} className="grid gap-2 rounded-xl border bg-muted/30 p-3">
+                <div className="flex items-center gap-2">
+                  <Input
+                    aria-label="List name"
+                    className="font-medium"
+                    value={column.title}
+                    onChange={(event) =>
+                      updateColumns(columns.map((item) => (item.id === column.id ? { ...item, title: event.target.value } : item)))
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Move up"
+                    disabled={index === 0}
+                    onClick={() => {
+                      const next = [...columns];
+                      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                      updateColumns(next);
+                    }}
+                  >
+                    <ArrowUp />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Move down"
+                    disabled={index === columns.length - 1}
+                    onClick={() => {
+                      const next = [...columns];
+                      [next[index + 1], next[index]] = [next[index], next[index + 1]];
+                      updateColumns(next);
+                    }}
+                  >
+                    <ArrowDown />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Delete ${column.title}`}
+                    disabled={columns.length <= 1}
+                    onClick={() => {
+                      const count = issues.filter((issue) => issue.status === column.id).length;
+                      const note = count ? ` ${count} card akan dipindah ke list "${columns.find((item) => item.id !== column.id)?.title}".` : "";
+                      if (window.confirm(`Hapus list "${column.title}"?${note}`)) deleteColumn(column.id);
+                    }}
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+                <Input
+                  aria-label="List description"
+                  value={column.description}
+                  onChange={(event) =>
+                    updateColumns(columns.map((item) => (item.id === column.id ? { ...item, description: event.target.value } : item)))
+                  }
+                  placeholder="Deskripsi list"
+                />
+              </li>
+            ))}
+          </ul>
+
+          <div>
+            <Button variant="outline" onClick={addColumn}>
+              <Plus />
+              Add list
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Card>
         <CardContent className="overflow-x-auto">
           <div className="grid min-w-[58rem] gap-4 xl:grid-cols-4">

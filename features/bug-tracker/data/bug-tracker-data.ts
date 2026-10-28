@@ -1,5 +1,6 @@
 export type Priority = "Critical" | "High" | "Medium" | "Low";
-export type IssueStatus = "Backlog" | "Ready" | "Investigating" | "In review" | "Done";
+// Kanban lists are user-editable, so any string is a valid status; the literals keep autocomplete.
+export type IssueStatus = "Backlog" | "Ready" | "Investigating" | "In review" | "Done" | (string & {});
 
 export type IssueRecord = {
   id: string;
