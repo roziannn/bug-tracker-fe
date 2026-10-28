@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlignLeft, Archive, ArrowDown, ArrowUp, Ban, Check, FolderOpenDot, Link2, MoreHorizontal, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
+import { AlignLeft, Archive, ArrowDown, ArrowUp, Ban, Check, FolderOpenDot, Link2, MoreHorizontal, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Save, Search, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -1203,6 +1203,7 @@ export function KanbanBoard() {
   const [hydrated, setHydrated] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [isListGroupOpen, setIsListGroupOpen] = useState(false);
+  const [draftColumns, setDraftColumns] = useState<KanbanColumn[]>([]);
   const [columns, setColumns] = useState<KanbanColumn[]>(() =>
     kanbanColumns.filter((column) => column.id !== "Backlog")
   );
@@ -1281,19 +1282,17 @@ export function KanbanBoard() {
     }
   }
 
-  function addColumn() {
-    updateColumns([...columns, { id: newId("list"), title: "New list", description: "" }]);
-  }
-
-  function deleteColumn(columnId: string) {
-    const remaining = columns.filter((column) => column.id !== columnId);
-    if (!remaining.length) return;
+  function saveColumns() {
+    const cleaned = draftColumns.map((column) => ({ ...column, title: column.title.trim() || "Untitled list" }));
+    if (!cleaned.length) return;
 
     // Cards of a deleted list move to the first remaining list instead of disappearing.
+    const keptIds = new Set(cleaned.map((column) => column.id));
     setIssues((current) =>
-      current.map((issue) => (issue.status === columnId ? { ...issue, status: remaining[0].id } : issue))
+      current.map((issue) => (keptIds.has(issue.status) ? issue : { ...issue, status: cleaned[0].id }))
     );
-    updateColumns(remaining);
+    updateColumns(cleaned);
+    setIsListGroupOpen(false);
   }
 
   function moveIssue(issueId: string, nextStatus: IssueStatus) {
@@ -1335,7 +1334,10 @@ export function KanbanBoard() {
         <KanbanToolbar
           showArchived={showArchived}
           onToggleArchived={() => setShowArchived((current) => !current)}
-          onOpenListGroup={() => setIsListGroupOpen(true)}
+          onOpenListGroup={() => {
+            setDraftColumns(columns);
+            setIsListGroupOpen(true);
+          }}
         />
       }
     >
@@ -1347,7 +1349,7 @@ export function KanbanBoard() {
           </DialogHeader>
 
           <ul className="grid gap-3">
-            {columns.map((column, index) => (
+            {draftColumns.map((column, index) => (
               <li key={column.id} className="grid gap-2 rounded-xl border bg-muted/30 p-3">
                 <div className="flex items-end gap-2">
                   <div className="grid flex-1 gap-1.5">
@@ -1359,7 +1361,7 @@ export function KanbanBoard() {
                       className="font-medium"
                       value={column.title}
                       onChange={(event) =>
-                        updateColumns(columns.map((item) => (item.id === column.id ? { ...item, title: event.target.value } : item)))
+                        setDraftColumns(draftColumns.map((item) => (item.id === column.id ? { ...item, title: event.target.value } : item)))
                       }
                     />
                   </div>
@@ -1369,9 +1371,9 @@ export function KanbanBoard() {
                     aria-label="Move up"
                     disabled={index === 0}
                     onClick={() => {
-                      const next = [...columns];
+                      const next = [...draftColumns];
                       [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                      updateColumns(next);
+                      setDraftColumns(next);
                     }}
                   >
                     <ArrowUp />
@@ -1380,11 +1382,11 @@ export function KanbanBoard() {
                     variant="ghost"
                     size="icon-sm"
                     aria-label="Move down"
-                    disabled={index === columns.length - 1}
+                    disabled={index === draftColumns.length - 1}
                     onClick={() => {
-                      const next = [...columns];
+                      const next = [...draftColumns];
                       [next[index + 1], next[index]] = [next[index], next[index + 1]];
-                      updateColumns(next);
+                      setDraftColumns(next);
                     }}
                   >
                     <ArrowDown />
@@ -1393,12 +1395,8 @@ export function KanbanBoard() {
                     variant="ghost"
                     size="icon-sm"
                     aria-label={`Delete ${column.title}`}
-                    disabled={columns.length <= 1}
-                    onClick={() => {
-                      const count = issues.filter((issue) => issue.status === column.id).length;
-                      const note = count ? ` ${count} card akan dipindah ke list "${columns.find((item) => item.id !== column.id)?.title}".` : "";
-                      if (window.confirm(`Hapus list "${column.title}"?${note}`)) deleteColumn(column.id);
-                    }}
+                    disabled={draftColumns.length <= 1}
+                    onClick={() => setDraftColumns(draftColumns.filter((item) => item.id !== column.id))}
                   >
                     <Trash2 />
                   </Button>
@@ -1411,7 +1409,7 @@ export function KanbanBoard() {
                     id={`list-desc-${column.id}`}
                     value={column.description}
                     onChange={(event) =>
-                      updateColumns(columns.map((item) => (item.id === column.id ? { ...item, description: event.target.value } : item)))
+                      setDraftColumns(draftColumns.map((item) => (item.id === column.id ? { ...item, description: event.target.value } : item)))
                     }
                     placeholder="Deskripsi singkat list ini"
                   />
@@ -1420,10 +1418,17 @@ export function KanbanBoard() {
             ))}
           </ul>
 
-          <div>
-            <Button variant="outline" onClick={addColumn}>
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDraftColumns([...draftColumns, { id: newId("list"), title: "New list", description: "" }])}
+            >
               <Plus />
               Add list
+            </Button>
+            <Button onClick={saveColumns}>
+              <Save />
+              Simpan
             </Button>
           </div>
         </DialogContent>
