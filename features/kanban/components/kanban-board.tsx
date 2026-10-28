@@ -1349,15 +1349,20 @@ export function KanbanBoard() {
           <ul className="grid gap-3">
             {columns.map((column, index) => (
               <li key={column.id} className="grid gap-2 rounded-xl border bg-muted/30 p-3">
-                <div className="flex items-center gap-2">
-                  <Input
-                    aria-label="List name"
-                    className="font-medium"
-                    value={column.title}
-                    onChange={(event) =>
-                      updateColumns(columns.map((item) => (item.id === column.id ? { ...item, title: event.target.value } : item)))
-                    }
-                  />
+                <div className="flex items-end gap-2">
+                  <div className="grid flex-1 gap-1.5">
+                    <label htmlFor={`list-name-${column.id}`} className="text-xs font-medium text-muted-foreground">
+                      Nama list
+                    </label>
+                    <Input
+                      id={`list-name-${column.id}`}
+                      className="font-medium"
+                      value={column.title}
+                      onChange={(event) =>
+                        updateColumns(columns.map((item) => (item.id === column.id ? { ...item, title: event.target.value } : item)))
+                      }
+                    />
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon-sm"
@@ -1398,14 +1403,19 @@ export function KanbanBoard() {
                     <Trash2 />
                   </Button>
                 </div>
-                <Input
-                  aria-label="List description"
-                  value={column.description}
-                  onChange={(event) =>
-                    updateColumns(columns.map((item) => (item.id === column.id ? { ...item, description: event.target.value } : item)))
-                  }
-                  placeholder="Deskripsi list"
-                />
+                <div className="grid gap-1.5">
+                  <label htmlFor={`list-desc-${column.id}`} className="text-xs font-medium text-muted-foreground">
+                    Deskripsi
+                  </label>
+                  <Input
+                    id={`list-desc-${column.id}`}
+                    value={column.description}
+                    onChange={(event) =>
+                      updateColumns(columns.map((item) => (item.id === column.id ? { ...item, description: event.target.value } : item)))
+                    }
+                    placeholder="Deskripsi singkat list ini"
+                  />
+                </div>
               </li>
             ))}
           </ul>
