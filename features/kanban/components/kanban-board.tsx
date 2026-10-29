@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlignLeft, Archive, ArrowDown, ArrowUp, Ban, Check, FolderOpenDot, Link2, MoreHorizontal, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Save, Search, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -108,12 +108,13 @@ function IssueCard({
   return (
     <Card
       draggable
+      data-flip-id={issue.id}
       onClick={() => onOpen(issue.id)}
       onDragStart={() => onDragStart(issue.id)}
       onDragEnd={onDragEnd}
       className={cn(
         "cursor-grab border border-foreground/15 bg-card dark:bg-zinc-800 shadow-md transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg active:cursor-grabbing",
-        dragging && "opacity-55 ring-2 ring-primary/30",
+        dragging && "scale-[0.97] opacity-50 ring-2 ring-primary/30",
         issue.inactive && "opacity-60 grayscale",
         issue.archived && "border-dashed"
       )}
@@ -209,7 +210,7 @@ function KanbanColumnView({
   return (
     <Card
       className={cn(
-        "relative flex h-full min-h-[32rem] flex-col border border-border/80 bg-muted dark:bg-black/40 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/80 before:content-['']",
+        "relative flex h-full min-h-[32rem] flex-col border border-border/80 transition-[background-color,border-color,box-shadow] duration-200 bg-muted dark:bg-black/40 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/80 before:content-['']",
         isOver && "border-primary bg-primary/5 before:bg-primary shadow-sm"
       )}
       onDragOver={(event) => {
@@ -1202,6 +1203,8 @@ export function KanbanBoard() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const previousRects = useRef<Map<string, DOMRect> | null>(null);
   const [isListGroupOpen, setIsListGroupOpen] = useState(false);
   const [draftColumns, setDraftColumns] = useState<KanbanColumn[]>([]);
   const [columns, setColumns] = useState<KanbanColumn[]>(() =>
@@ -1295,7 +1298,46 @@ export function KanbanBoard() {
     setIsListGroupOpen(false);
   }
 
+  // FLIP: remember where every card is before a move, then animate from there to the new spot.
+  function captureRects() {
+    const rects = new Map<string, DOMRect>();
+    boardRef.current?.querySelectorAll<HTMLElement>("[data-flip-id]").forEach((element) => {
+      rects.set(element.dataset.flipId!, element.getBoundingClientRect());
+    });
+    previousRects.current = rects;
+  }
+
+  useLayoutEffect(() => {
+    const previous = previousRects.current;
+    if (!previous) return;
+    previousRects.current = null;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    boardRef.current?.querySelectorAll<HTMLElement>("[data-flip-id]").forEach((element) => {
+      const before = previous.get(element.dataset.flipId!);
+      if (!before) return;
+
+      const after = element.getBoundingClientRect();
+      const dx = before.left - after.left;
+      const dy = before.top - after.top;
+      if (!dx && !dy) return;
+
+      element.style.transition = "none";
+      element.style.transform = `translate(${dx}px, ${dy}px)`;
+      void element.offsetWidth;
+      element.style.transition = "transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)";
+      element.style.transform = "";
+
+      const cleanup = () => {
+        element.style.transition = "";
+        element.removeEventListener("transitionend", cleanup);
+      };
+      element.addEventListener("transitionend", cleanup);
+    });
+  }, [issues]);
+
   function moveIssue(issueId: string, nextStatus: IssueStatus) {
+    captureRects();
     setIssues((current) =>
       current.map((issue) =>
         issue.id === issueId ? { ...issue, status: nextStatus } : issue
@@ -1435,7 +1477,7 @@ export function KanbanBoard() {
       </Dialog>
       <Card>
         <CardContent className="overflow-x-auto">
-          <div className="grid min-w-[58rem] gap-4 xl:grid-cols-4">
+          <div ref={boardRef} className="grid min-w-[58rem] gap-4 xl:grid-cols-4">
             {groupedIssues.map((column) => (
               <KanbanColumnView
                 key={column.id}
