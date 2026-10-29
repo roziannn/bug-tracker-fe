@@ -15,3 +15,10 @@ export const createUserSchema = z.object({
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
+
+export const roleSchema = z.object({
+  name: z.string().trim().min(1, "Nama role wajib diisi").max(100, "Nama role maksimal 100 karakter"),
+  isActive: z.boolean().optional(),
+});
+
+export type RoleInput = z.infer<typeof roleSchema>;

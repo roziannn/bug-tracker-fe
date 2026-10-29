@@ -24,9 +24,24 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
 
   useEffect(() => {
     setMenus(loadMenus());
-    const found = loadRoles().find((item) => item.name === roleName) ?? defaultRoles.find((item) => item.name === roleName);
-    setRole(found ?? null);
-    setNotFound(!found);
+
+    // Role berasal dari database; akses menu/button-nya masih disimpan di browser per nama role.
+    async function load() {
+      let exists = false;
+      try {
+        const res = await fetch(`/api/roles?pageSize=100&search=${encodeURIComponent(roleName)}`, { cache: "no-store" });
+        const body = (await res.json()) as { data?: { Name: string }[] };
+        exists = !!body.data?.some((item) => item.Name === roleName);
+      } catch {
+        exists = false;
+      }
+
+      const found = loadRoles().find((item) => item.name === roleName) ?? defaultRoles.find((item) => item.name === roleName);
+      setRole(exists ? (found ?? { name: roleName, menus: ["overview"], actions: [] }) : null);
+      setNotFound(!exists);
+    }
+
+    load();
   }, [roleName]);
 
   function setMenu(menuId: string, enabled: boolean) {
