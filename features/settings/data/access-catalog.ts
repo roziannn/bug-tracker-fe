@@ -6,6 +6,8 @@ export type MenuNode = {
   icon: string;
   visible: boolean;
   actions: { id: string; label: string }[];
+  CreatedBy?: string | null;
+  CreatedDate?: string;
 };
 
 const rootMenus = [

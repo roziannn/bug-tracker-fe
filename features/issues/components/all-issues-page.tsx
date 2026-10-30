@@ -20,6 +20,7 @@
     type IssueStatus,
     type Priority,
   } from "@/features/bug-tracker/data/bug-tracker-data";
+  import { formatDate } from "@/lib/date";
 
   const PAGE_SIZE = 10;
 
@@ -58,13 +59,6 @@
     },
   ] as const;
 
-  function formatDate(dateString: string) {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(dateString));
-  }
 
   function exportIssuesToCsv(rows: IssueRecord[]) {
     const headers = ["Ticket ID", "Title", "Status", "Priority", "Label", "Created Date"];

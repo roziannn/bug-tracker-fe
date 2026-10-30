@@ -19,25 +19,24 @@ import {
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { defaultMenus, type MenuNode } from "@/features/settings/data/access-catalog";
 import { loadMenus } from "@/features/settings/data/menu-store";
 import { loadRoles, saveRoles, type RoleAccess } from "@/features/settings/data/role-access-store";
 import { appToast } from "@/lib/app-toast";
+import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { Paged, Role } from "@/types";
 
 const PAGE_SIZE = 5;
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-}
 
 type Draft ={ id: number | null; name: string; isActive: boolean; originalName: string };
 
 export function RoleSettingsPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loadedPage, setLoadedPage] = useState<number | null>(null);
   const [access, setAccess] = useState<RoleAccess[]>([]);
   const [menus, setMenus] = useState<MenuNode[]>(defaultMenus);
   const [page, setPage] = useState(1);
@@ -46,9 +45,10 @@ export function RoleSettingsPage() {
   const totalActions = menus.reduce((sum, menu) => sum + menu.actions.length, 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
+  // Skeleton tampil saat pertama kali memuat dan saat pindah halaman, bukan saat refresh setelah simpan.
+  const showSkeleton = loadedPage !== page;
 
   const fetchRoles = useCallback(async () => {
-    setLoading(true);
     try {
       const res = await fetch(`/api/roles?page=${page}&pageSize=${PAGE_SIZE}`, { cache: "no-store" });
       if (!res.ok) throw new Error();
@@ -56,9 +56,9 @@ export function RoleSettingsPage() {
       setRoles(body.data);
       setTotal(body.total);
     } catch {
-      appToast.error({ title: "Gagal memuat role", description: "Terjadi kesalahan, coba lagi." });
+      appToast.error({ title: "Failed to load roles", description: "Something went wrong, please try again." });
     } finally {
-      setLoading(false);
+      setLoadedPage(page);
     }
   }, [page]);
 
@@ -86,7 +86,7 @@ export function RoleSettingsPage() {
       const body = await res.json();
 
       if (!res.ok) {
-        appToast.error({ title: "Gagal menyimpan role", description: body.error ?? "Terjadi kesalahan, coba lagi." });
+        appToast.error({ title: "Failed to save role", description: body.error ?? "Something went wrong, please try again." });
         return;
       }
 
@@ -97,11 +97,11 @@ export function RoleSettingsPage() {
         setAccess(next);
       }
 
-      appToast.success({ title: draft.id ? "Role diperbarui" : "Role ditambahkan", description: name });
+      appToast.success({ title: draft.id ? "Role updated" : "Role added", description: name });
       setDraft(null);
       await fetchRoles();
     } catch {
-      appToast.error({ title: "Gagal menyimpan role", description: "Terjadi kesalahan, coba lagi." });
+      appToast.error({ title: "Failed to save role", description: "Something went wrong, please try again." });
     } finally {
       setSaving(false);
     }
@@ -118,7 +118,7 @@ export function RoleSettingsPage() {
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Role settings</h2>
             <p className="text-sm text-muted-foreground">
-              Kelola role, lalu atur menu dan button yang aktif lewat halaman access masing-masing role.
+              Manage roles, then set the active menus and buttons from each role's access page.
             </p>
           </div>
 
@@ -137,12 +137,14 @@ export function RoleSettingsPage() {
                 <TableHead>Role</TableHead>
                 <TableHead>Menus</TableHead>
                 <TableHead>Buttons</TableHead>
+                <TableHead>Created by</TableHead>
                 <TableHead>Created date</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {roles.map((role) => {
+              {showSkeleton ? <TableSkeletonRows rows={PAGE_SIZE} columns={6} /> : null}
+              {(showSkeleton ? [] : roles).map((role) => {
                 const roleAccess = access.find((item) => item.name === role.Name);
                 const menuCount = (roleAccess?.menus ?? ["overview"]).filter((id) =>
                   menus.some((menu) => menu.id === id)
@@ -157,7 +159,7 @@ export function RoleSettingsPage() {
                       {role.Name}
                       {!role.IsActive ? (
                         <Badge variant="outline" className="ml-2">
-                          Nonaktif
+                          Inactive
                         </Badge>
                       ) : null}
                     </TableCell>
@@ -167,6 +169,7 @@ export function RoleSettingsPage() {
                     <TableCell>
                       {actionCount} / {totalActions}
                     </TableCell>
+                    <TableCell className="text-muted-foreground">{role.CreatedBy || "System"}</TableCell>
                     <TableCell className="text-muted-foreground">{formatDate(role.CreatedDate)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -194,10 +197,10 @@ export function RoleSettingsPage() {
                   </TableRow>
                 );
               })}
-              {!loading && roles.length === 0 ? (
+              {!showSkeleton && roles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                    Belum ada role. Klik Add Role untuk menambahkan.
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    No roles yet. Click Add Role to create one.
                   </TableCell>
                 </TableRow>
               ) : null}
@@ -218,7 +221,7 @@ export function RoleSettingsPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{draft?.id ? "Edit role" : "Add new role"}</DialogTitle>
-            <DialogDescription>Akses menu dan button bisa diatur lewat Configure access.</DialogDescription>
+            <DialogDescription>Menu and button access can be set from Configure access.</DialogDescription>
           </DialogHeader>
 
           {draft ? (
@@ -232,16 +235,16 @@ export function RoleSettingsPage() {
                   value={draft.name}
                   maxLength={100}
                   onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                  placeholder="Contoh: Product Manager"
+                  placeholder="Example: Product Manager"
                 />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Aktif</span>
+                <span className="text-sm font-medium">Active</span>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={draft.isActive}
-                  aria-label="Aktifkan role"
+                  aria-label="Activate role"
                   onClick={() => setDraft({ ...draft, isActive: !draft.isActive })}
                   className={cn(
                     "relative h-5 w-9 rounded-full transition-colors",
@@ -261,7 +264,7 @@ export function RoleSettingsPage() {
 
           <DialogFooter showCloseButton>
             <Button onClick={saveDraft} disabled={!draft?.name.trim() || saving}>
-              {saving ? "Menyimpan..." : "Simpan"}
+              {saving ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

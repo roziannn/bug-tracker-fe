@@ -28,6 +28,7 @@ import {
   priorityVariant,
 } from "@/features/bug-tracker/data/bug-tracker-data";
 import { appToast } from "@/lib/app-toast";
+import { formatDate } from "@/lib/date";
 
 const issueStatusOptions = ["Backlog", "Ready", "Investigating", "In review", "Done"] as const;
 
@@ -60,11 +61,7 @@ function formatFileSize(size: number) {
 }
 
 function formatHistoryDate(dateString: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(dateString));
+  return formatDate(dateString);
 }
 
 const issueEvidence = {

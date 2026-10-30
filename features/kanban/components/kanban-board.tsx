@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatDate, formatDateTime as formatDateTimeStamp } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import {
   issues as initialIssues,
@@ -358,8 +359,7 @@ function toIsoDate(year: number, month: number, day: number) {
 }
 
 function formatDateTime(date: string, time?: string) {
-  const [year, month, day] = date.split("-");
-  return `${Number(day)}/${Number(month)}/${year}${time ? ` ${time}` : ""}`;
+  return `${formatDate(date)}${time ? ` ${time}` : ""}`;
 }
 
 type DatesDraft = {
@@ -1107,7 +1107,7 @@ function IssueDetailDialog({
                       <p className="text-sm">
                         <span className="font-semibold">{comment.author}</span>{" "}
                         <span className="text-xs text-muted-foreground">
-                          {new Date(comment.createdAt).toLocaleString("id-ID")}
+                          {formatDateTimeStamp(comment.createdAt)}
                         </span>
                       </p>
                       {editingCommentId === comment.id ? (

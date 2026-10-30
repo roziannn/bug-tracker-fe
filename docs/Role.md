@@ -32,7 +32,7 @@ Tidak ada hapus (delete). Role yang tidak dipakai cukup dinonaktifkan lewat swit
 
 File: [features/settings/components/role-settings-page.tsx](../features/settings/components/role-settings-page.tsx)
 
-- **Tabel:** kolom Role, Menus, Buttons, Created date, Action. Role nonaktif tampil redup dengan badge "Nonaktif".
+- **Tabel:** kolom Role, Menus, Buttons, Created by, Created date, Action. Role nonaktif tampil redup dengan badge "Inactive".
 - **Pagination:** dari server, 5 role per halaman.
 - **Add Role:** membuka dialog berisi nama role dan switch Aktif.
 - **Ikon pensil:** membuka dialog yang sama untuk mengedit nama dan status aktif.
@@ -62,14 +62,14 @@ Respons error:
 
 | Status | Penyebab | Pesan |
 |--------|----------|-------|
-| 400 | nama kosong, lebih dari 100 karakter, atau id tidak valid | "Nama role wajib diisi" / "Nama role maksimal 100 karakter" / "Invalid id" |
+| 400 | nama kosong, lebih dari 100 karakter, atau id tidak valid | "Role name is required" / "Role name must be at most 100 characters" / "Invalid id" |
 | 404 | role tidak ditemukan (`PUT`/`GET` by id) | "Role not found" |
-| 409 | nama sudah dipakai role lain | "Nama role sudah dipakai" |
+| 409 | nama sudah dipakai role lain | "Role name is already in use" |
 | 500 | kesalahan server | "Internal server error" |
 
 Nama dicek kembar **tanpa membedakan huruf besar/kecil**: "Admin" dan "admin" dianggap sama. Karakter seperti `_` dan `%` diperlakukan biasa, jadi "QA_Lead" dan "QA-Lead" boleh ada bersamaan.
 
-`CreatedBy` dan `UpdatedBy` diisi dari email di sesi login. Selama belum login, nilainya `null`.
+`CreatedBy` diisi dari email di sesi login. Kalau belum login, diisi `System`. Role lama yang `CreatedBy`-nya `null` tetap tampil sebagai "System" di tabel. `UpdatedBy` diisi email login, atau `null` kalau belum login.
 
 ## Letak kode
 

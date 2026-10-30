@@ -10,6 +10,8 @@ export interface User extends AuditFields {
   Name: string;
   Email: string;
   IsActive: boolean;
+  RoleId?: number | null;
+  RoleName?: string | null;
 }
 
 export interface Role extends AuditFields {

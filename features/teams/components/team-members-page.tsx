@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft, Edit, Edit2, Pencil, Save, UserPlus } from "lucide-react";
+import { formatDate } from "@/lib/date";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -213,11 +214,7 @@ export function TeamMembersPage({ id }: { id: string }) {
                       <TableCell>{member.accessLevel}</TableCell>
                       <TableCell>{member.createdBy}</TableCell>
                       <TableCell className="text-muted-foreground">
-                      {new Date(member.createdAt).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
+                      {formatDate(member.createdAt)}
                     </TableCell>
                       <TableCell>{member.isActive ? "Yes" : "No"}</TableCell>
                       <TableCell>

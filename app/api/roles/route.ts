@@ -21,8 +21,8 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) return fail(parsed.error.issues[0].message, 400);
 
     const session = await getSession();
-    const result = await createRole(parsed.data, session?.email ?? null);
-    if (result === "name-taken") return fail("Nama role sudah dipakai", 409);
+    const result = await createRole(parsed.data, session?.email ?? "System");
+    if (result === "name-taken") return fail("Role name is already in use", 409);
     return ok(result, 201);
   } catch (err) {
     return handleError(err);

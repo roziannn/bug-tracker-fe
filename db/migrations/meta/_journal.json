@@ -8,6 +8,13 @@
       "when": 1793188169341,
       "tag": "0000_lonely_blur",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793324501623,
+      "tag": "0001_lonely_kat_farrell",
+      "breakpoints": true
     }
   ]
 }

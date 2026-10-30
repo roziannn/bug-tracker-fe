@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const session = await getSession();
     const result = await updateRole(id, parsed.data, session?.email ?? null);
     if (result === "not-found") return fail("Role not found", 404);
-    if (result === "name-taken") return fail("Nama role sudah dipakai", 409);
+    if (result === "name-taken") return fail("Role name is already in use", 409);
     return ok(result);
   } catch (err) {
     return handleError(err);

@@ -71,7 +71,7 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
         <div className="flex flex-col gap-3">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Access: {roleName}</h2>
-            <p className="text-sm text-muted-foreground">Aktifkan menu, lalu pilih button yang boleh dipakai role ini.</p>
+            <p className="text-sm text-muted-foreground">Enable a menu, then choose which buttons this role can use.</p>
           </div>
         </div>
       }
@@ -93,7 +93,7 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
 
         {notFound ? (
           <Card>
-            <CardContent className="py-8 text-sm text-muted-foreground">Role “{roleName}” tidak ditemukan.</CardContent>
+            <CardContent className="py-8 text-sm text-muted-foreground">Role “{roleName}” not found.</CardContent>
           </Card>
         ) : null}
 
