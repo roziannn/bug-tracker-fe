@@ -8,8 +8,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { defaultMenus, type MenuNode } from "@/features/settings/data/access-catalog";
-import { loadMenus, orderMenus } from "@/features/settings/data/menu-store";
+import type { MenuNode } from "@/features/settings/data/access-catalog";
+import { fetchMenus, orderMenus } from "@/features/settings/data/menu-store";
 import { defaultRoles, loadRoles, saveRoles, type RoleAccess } from "@/features/settings/data/role-access-store";
 
 function toggle(list: string[], id: string, enabled: boolean) {
@@ -19,11 +19,13 @@ function toggle(list: string[], id: string, enabled: boolean) {
 export function RoleAccessPage({ roleName }: { roleName: string }) {
   const [role, setRole] = useState<RoleAccess | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [menus, setMenus] = useState<MenuNode[]>(defaultMenus);
+  const [menus, setMenus] = useState<MenuNode[]>([]);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setMenus(loadMenus());
+    fetchMenus()
+      .then(setMenus)
+      .catch(() => setMenus([]));
 
     // Role berasal dari database; akses menu/button-nya masih disimpan di browser per nama role.
     async function load() {

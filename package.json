@@ -14,6 +14,7 @@
     "db:tables": "dotenv -e .env -- tsx scripts/db-tables.ts",
     "db:query": "dotenv -e .env -- tsx scripts/db-query.ts",
     "test-db": "dotenv -e .env -- tsx scripts/test-db.ts",
+    "seed-menu": "dotenv -e .env -- tsx scripts/seed-menu.ts",
     "seed-user": "dotenv -e .env -- tsx scripts/seed-user.ts"
   },
   "dependencies": {

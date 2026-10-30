@@ -20,8 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
-import { defaultMenus, type MenuNode } from "@/features/settings/data/access-catalog";
-import { loadMenus } from "@/features/settings/data/menu-store";
+import type { MenuNode } from "@/features/settings/data/access-catalog";
+import { fetchMenus } from "@/features/settings/data/menu-store";
 import { loadRoles, saveRoles, type RoleAccess } from "@/features/settings/data/role-access-store";
 import { appToast } from "@/lib/app-toast";
 import { formatDate } from "@/lib/date";
@@ -38,7 +38,7 @@ export function RoleSettingsPage() {
   const [total, setTotal] = useState(0);
   const [loadedPage, setLoadedPage] = useState<number | null>(null);
   const [access, setAccess] = useState<RoleAccess[]>([]);
-  const [menus, setMenus] = useState<MenuNode[]>(defaultMenus);
+  const [menus, setMenus] = useState<MenuNode[]>([]);
   const [page, setPage] = useState(1);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -68,7 +68,9 @@ export function RoleSettingsPage() {
 
   useEffect(() => {
     setAccess(loadRoles());
-    setMenus(loadMenus());
+    fetchMenus()
+      .then(setMenus)
+      .catch(() => setMenus([]));
   }, []);
 
   async function saveDraft() {
@@ -118,7 +120,7 @@ export function RoleSettingsPage() {
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Role settings</h2>
             <p className="text-sm text-muted-foreground">
-              Manage roles, then set the active menus and buttons from each role's access page.
+              Manage roles, then set the active menus and buttons from each role&apos;s access page.
             </p>
           </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ArrowDown, ArrowUp, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { defaultMenus, type MenuNode } from "@/features/settings/data/access-catalog";
-import { loadMenus, orderMenus, saveMenus, slugify } from "@/features/settings/data/menu-store";
+import { TableSkeletonRows } from "@/components/ui/table-skeleton";
+import type { MenuNode } from "@/features/settings/data/access-catalog";
+import { fetchMenus, orderMenus } from "@/features/settings/data/menu-store";
 import { getMenuIcon, menuIcons, NO_ICON } from "@/features/settings/data/menu-icons";
+import { appToast } from "@/lib/app-toast";
+import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 const ROOT = "none";
+const COLUMNS = 8;
 
 type Draft = {
   id: string | null;
@@ -30,48 +34,77 @@ type Draft = {
   path: string;
   icon: string;
   parentId: string;
-  actions: MenuNode["actions"];
+  actions: { id?: string; label: string }[];
 };
+
+// Path awal untuk sub menu: path parent + "/", supaya tinggal dilanjutkan (mis. "/settings/" lalu "menu").
+function parentPathPrefix(parent: MenuNode | undefined) {
+  if (!parent?.path) return "";
+  return `${parent.path.replace(//+$/, "")}/`;
+}
 
 const emptyDraft: Draft = { id: null, label: "", path: "", icon: "Circle", parentId: ROOT, actions: [] };
 
 export function MenuSettingsPage() {
-  const [menus, setMenus] = useState<MenuNode[]>(defaultMenus);
+  const [menus, setMenus] = useState<MenuNode[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [buttonName, setButtonName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<MenuNode | null>(null);
   const rows = orderMenus(menus);
   const parents = menus.filter((menu) => !menu.parentId && menu.id !== draft?.id);
+  // Menu yang sudah punya sub menu tidak bisa dijadikan sub menu.
+  const draftHasChildren = draft?.id ? menus.some((menu) => menu.parentId === draft.id) : false;
 
-  useEffect(() => {
-    setMenus(loadMenus());
+  const loadMenus = useCallback(async () => {
+    try {
+      setMenus(await fetchMenus());
+    } catch {
+      appToast.error({ title: "Failed to load menus", description: "Something went wrong, please try again." });
+    } finally {
+      setLoaded(true);
+    }
   }, []);
 
-  function commit(next: MenuNode[]) {
-    setMenus(next);
-    saveMenus(next);
+  useEffect(() => {
+    loadMenus();
+  }, [loadMenus]);
+
+  async function request(url: string, method: string, body?: unknown) {
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error ?? "Something went wrong, please try again.");
+    return data;
+  }
+
+  async function runAction(id: string, action: () => Promise<void>, failTitle: string) {
+    setBusyId(id);
+    try {
+      await action();
+      await loadMenus();
+    } catch (err) {
+      appToast.error({ title: failTitle, description: err instanceof Error ? err.message : undefined });
+    } finally {
+      setBusyId(null);
+    }
   }
 
   function move(id: string, direction: -1 | 1) {
-    const current = menus.find((menu) => menu.id === id);
-    if (!current) return;
-
-    const siblings = menus.filter((menu) => menu.parentId === current.parentId);
-    const target = siblings[siblings.indexOf(current) + direction];
-    if (!target) return;
-
-    const next = [...menus];
-    const a = next.indexOf(current);
-    const b = next.indexOf(target);
-    [next[a], next[b]] = [next[b], next[a]];
-    commit(next);
+    return runAction(id, () => request(`/api/menus/${id}/move`, "POST", { direction }), "Failed to reorder menu");
   }
 
-  function toggleVisible(id: string) {
-    commit(menus.map((menu) => (menu.id === id ? { ...menu, visible: !menu.visible } : menu)));
-  }
-
-  function removeMenu(id: string) {
-    commit(menus.filter((menu) => menu.id !== id && menu.parentId !== id));
+  function toggleVisible(menu: MenuNode) {
+    return runAction(
+      menu.id,
+      () => request(`/api/menus/${menu.id}`, "PATCH", { visible: !menu.visible }),
+      "Failed to update menu"
+    );
   }
 
   function openEdit(menu: MenuNode) {
@@ -86,26 +119,63 @@ export function MenuSettingsPage() {
     });
   }
 
+  function changeParent(parentId: string) {
+    if (!draft) return;
+
+    const oldPrefix = parentPathPrefix(menus.find((menu) => menu.id === draft.parentId));
+    const newPrefix = parentPathPrefix(menus.find((menu) => menu.id === parentId));
+    const path = draft.path.trim();
+
+    // Path hanya diganti kalau masih kosong atau masih berupa awalan parent lama (belum diketik sendiri).
+    const untouched = path === "" || (oldPrefix !== "" && path === oldPrefix);
+    setDraft({ ...draft, parentId, path: untouched ? newPrefix : draft.path });
+  }
+
   function addDraftButton() {
     const name = buttonName.trim();
     if (!name || !draft) return;
 
-    setDraft({ ...draft, actions: [...draft.actions, { id: `${draft.id ?? "new"}.${slugify(name)}`, label: name }] });
+    setDraft({ ...draft, actions: [...draft.actions, { label: name }] });
     setButtonName("");
   }
 
-  function saveDraft() {
-    if (!draft || !draft.label.trim()) return;
+  async function saveDraft() {
+    if (!draft || saving || !draft.label.trim()) return;
 
-    const parentId = draft.parentId === ROOT ? null : draft.parentId;
-    const fields = { label: draft.label.trim(), path: draft.path.trim(), icon: draft.icon, parentId, actions: draft.actions };
+    setSaving(true);
+    try {
+      const payload = {
+        label: draft.label.trim(),
+        path: draft.path.trim(),
+        icon: draft.icon,
+        parentId: draft.parentId === ROOT ? null : draft.parentId,
+        actions: draft.actions,
+      };
+      await (draft.id ? request(`/api/menus/${draft.id}`, "PUT", payload) : request("/api/menus", "POST", payload));
 
-    commit(
-      draft.id
-        ? menus.map((menu) => (menu.id === draft.id ? { ...menu, ...fields } : menu))
-        : [...menus, { id: slugify(draft.label), visible: true, ...fields }]
+      appToast.success({ title: draft.id ? "Menu updated" : "Menu added", description: payload.label });
+      setDraft(null);
+      await loadMenus();
+    } catch (err) {
+      appToast.error({ title: "Failed to save menu", description: err instanceof Error ? err.message : undefined });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!toDelete) return;
+    const menu = toDelete;
+
+    await runAction(
+      menu.id,
+      async () => {
+        await request(`/api/menus/${menu.id}`, "DELETE");
+        appToast.success({ title: "Menu deleted", description: menu.label });
+      },
+      "Failed to delete menu"
     );
-    setDraft(null);
+    setToDelete(null);
   }
 
   return (
@@ -119,24 +189,18 @@ export function MenuSettingsPage() {
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Menu</h2>
             <p className="text-sm text-muted-foreground">
-              Atur menu di sidebar: urutan, nama, ikon, button, dan tampil atau tidaknya.
+              Manage sidebar menus: order, name, icon, buttons, and visibility.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => commit(defaultMenus)}>
-              <RotateCcw />
-              Reset Default
-            </Button>
-            <Button
-              onClick={() => {
-                setButtonName("");
-                setDraft(emptyDraft);
-              }}
-            >
-              <Plus />
-              Tambah Menu
-            </Button>
-          </div>
+          <Button
+            onClick={() => {
+              setButtonName("");
+              setDraft(emptyDraft);
+            }}
+          >
+            <Plus />
+            Add Menu
+          </Button>
         </div>
       }
     >
@@ -147,20 +211,24 @@ export function MenuSettingsPage() {
               <TableRow>
                 <TableHead>Menu</TableHead>
                 <TableHead>Path</TableHead>
-                <TableHead>Button</TableHead>
-                <TableHead>Urutan</TableHead>
-                <TableHead>Tampil</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
+                <TableHead>Buttons</TableHead>
+                <TableHead>Order</TableHead>
+                <TableHead>Visible</TableHead>
+                <TableHead>Created by</TableHead>
+                <TableHead>Created date</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
+              {!loaded ? <TableSkeletonRows rows={7} columns={COLUMNS} /> : null}
               {rows.map(({ menu, depth }) => {
                 const Icon = getMenuIcon(menu.icon);
                 const siblings = menus.filter((item) => item.parentId === menu.parentId);
                 const position = siblings.indexOf(menu);
+                const busy = busyId === menu.id;
 
                 return (
-                  <TableRow key={menu.id}>
+                  <TableRow key={menu.id} className={cn(!menu.visible && "opacity-60")}>
                     <TableCell>
                       <div className={cn("flex items-center gap-3 font-medium", depth && "pl-8")}>
                         {Icon ? (
@@ -178,8 +246,8 @@ export function MenuSettingsPage() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label="Naik"
-                          disabled={position === 0}
+                          aria-label="Move up"
+                          disabled={busy || position === 0}
                           onClick={() => move(menu.id, -1)}
                         >
                           <ArrowUp />
@@ -187,8 +255,8 @@ export function MenuSettingsPage() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label="Turun"
-                          disabled={position === siblings.length - 1}
+                          aria-label="Move down"
+                          disabled={busy || position === siblings.length - 1}
                           onClick={() => move(menu.id, 1)}
                         >
                           <ArrowDown />
@@ -200,8 +268,9 @@ export function MenuSettingsPage() {
                         type="button"
                         role="switch"
                         aria-checked={menu.visible}
-                        aria-label={`Tampilkan ${menu.label}`}
-                        onClick={() => toggleVisible(menu.id)}
+                        aria-label={`Show ${menu.label}`}
+                        disabled={busy}
+                        onClick={() => toggleVisible(menu)}
                         className={cn(
                           "relative h-5 w-9 rounded-full transition-colors",
                           menu.visible ? "bg-primary" : "bg-muted-foreground/30"
@@ -215,12 +284,22 @@ export function MenuSettingsPage() {
                         />
                       </button>
                     </TableCell>
+                    <TableCell className="text-muted-foreground">{menu.CreatedBy || "System"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {menu.CreatedDate ? formatDate(menu.CreatedDate) : "-"}
+                    </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon-sm" aria-label={`Edit ${menu.label}`} onClick={() => openEdit(menu)}>
                           <Pencil />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" aria-label={`Hapus ${menu.label}`} onClick={() => removeMenu(menu.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Delete ${menu.label}`}
+                          disabled={busy}
+                          onClick={() => setToDelete(menu)}
+                        >
                           <Trash2 />
                         </Button>
                       </div>
@@ -228,6 +307,13 @@ export function MenuSettingsPage() {
                   </TableRow>
                 );
               })}
+              {loaded && rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={COLUMNS} className="py-8 text-center text-muted-foreground">
+                    No menus yet. Click Add Menu to create one, or run <code>pnpm seed-menu</code> to load the defaults.
+                  </TableCell>
+                </TableRow>
+              ) : null}
             </TableBody>
           </Table>
         </CardContent>
@@ -236,70 +322,86 @@ export function MenuSettingsPage() {
       <Dialog open={draft !== null} onOpenChange={(open) => !open && setDraft(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{draft?.id ? "Edit menu" : "Tambah menu"}</DialogTitle>
-            <DialogDescription>Pilih parent untuk membuat sub menu, dan tambahkan button yang tersedia di menu ini.</DialogDescription>
+            <DialogTitle>{draft?.id ? "Edit menu" : "Add menu"}</DialogTitle>
+            <DialogDescription>Choose a parent to create a sub menu, and add the buttons available in this menu.</DialogDescription>
           </DialogHeader>
 
           {draft ? (
             <div className="grid gap-4">
               <div className="grid gap-2">
                 <label htmlFor="menu-label" className="text-sm font-medium">
-                  Nama
+                  Name
                 </label>
-                <Input id="menu-label" value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} />
+                <Input
+                  id="menu-label"
+                  maxLength={100}
+                  value={draft.label}
+                  onChange={(event) => setDraft({ ...draft, label: event.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Parent</label>
+                <Select
+                  value={draft.parentId}
+                  disabled={draftHasChildren}
+                  items={[{ value: ROOT, label: "No parent" }, ...parents.map((menu) => ({ value: menu.id, label: menu.label }))]}
+                  onValueChange={(value) => changeParent(value ?? ROOT)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ROOT}>No parent</SelectItem>
+                    {parents.map((menu) => (
+                      <SelectItem key={menu.id} value={menu.id}>
+                        {menu.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {draftHasChildren ? (
+                  <p className="text-xs text-muted-foreground">This menu has sub menus, so it must stay a main menu.</p>
+                ) : null}
               </div>
               <div className="grid gap-2">
                 <label htmlFor="menu-path" className="text-sm font-medium">
                   Path
                 </label>
-                <Input id="menu-path" value={draft.path} onChange={(event) => setDraft({ ...draft, path: event.target.value })} placeholder="/reports" />
+                <Input
+                  id="menu-path"
+                  value={draft.path}
+                  onChange={(event) => setDraft({ ...draft, path: event.target.value })}
+                  placeholder={draft.parentId === ROOT ? "/reports" : "Continue the parent path, e.g. /settings/menu"}
+                />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Ikon</label>
-                  <Select value={draft.icon} onValueChange={(value) => setDraft({ ...draft, icon: value ?? "Circle" })}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_ICON}>None</SelectItem>
-                      {Object.keys(menuIcons).map((name) => (
-                        <SelectItem key={name} value={name}>
-                          {name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Parent</label>
-                  <Select value={draft.parentId} onValueChange={(value) => setDraft({ ...draft, parentId: value ?? ROOT })}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ROOT}>Tanpa parent</SelectItem>
-                      {parents.map((menu) => (
-                        <SelectItem key={menu.id} value={menu.id}>
-                          {menu.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Icon</label>
+                <Select value={draft.icon} onValueChange={(value) => setDraft({ ...draft, icon: value ?? "Circle" })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_ICON}>None</SelectItem>
+                    {Object.keys(menuIcons).map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Button</label>
+                <label className="text-sm font-medium">Buttons</label>
                 {draft.actions.length ? (
                   <div className="flex flex-wrap gap-2">
-                    {draft.actions.map((action) => (
-                      <span key={action.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
+                    {draft.actions.map((action, index) => (
+                      <span key={action.id ?? `new-${index}`} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
                         {action.label}
                         <button
                           type="button"
-                          aria-label={`Hapus ${action.label}`}
-                          onClick={() => setDraft({ ...draft, actions: draft.actions.filter((item) => item.id !== action.id) })}
+                          aria-label={`Remove ${action.label}`}
+                          onClick={() => setDraft({ ...draft, actions: draft.actions.filter((_, i) => i !== index) })}
                         >
                           <X className="size-3" />
                         </button>
@@ -310,13 +412,14 @@ export function MenuSettingsPage() {
                 <div className="flex gap-2">
                   <Input
                     value={buttonName}
+                    maxLength={100}
                     onChange={(event) => setButtonName(event.target.value)}
                     onKeyDown={(event) => event.key === "Enter" && addDraftButton()}
-                    placeholder="Nama button, mis. Export"
+                    placeholder="Button name, e.g. Export"
                   />
                   <Button variant="outline" onClick={addDraftButton}>
                     <Plus />
-                    Tambah
+                    Add
                   </Button>
                 </div>
               </div>
@@ -324,7 +427,26 @@ export function MenuSettingsPage() {
           ) : null}
 
           <DialogFooter showCloseButton>
-            <Button onClick={saveDraft}>Simpan</Button>
+            <Button onClick={saveDraft} disabled={saving || !draft?.label.trim()}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={toDelete !== null} onOpenChange={(open) => !open && setToDelete(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete menu</DialogTitle>
+            <DialogDescription>
+              Delete “{toDelete?.label}”? Its sub menus and buttons will be deleted too. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter showCloseButton>
+            <Button variant="destructive" onClick={confirmDelete} disabled={busyId !== null}>
+              <Trash2 />
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
