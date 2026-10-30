@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const session = await getSession();
     const result = await createMenu(parsed.data, session?.email ?? "System");
     if (result === "parent-not-found") return fail("Parent menu not found", 400);
-    if (result === "invalid-parent") return fail("Parent must be a main menu", 400);
+    if (result === "invalid-parent") return fail("Invalid parent menu", 400);
     return ok(result, 201);
   } catch (err) {
     return handleError(err);

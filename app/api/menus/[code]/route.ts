@@ -26,7 +26,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const result = await updateMenu((await params).code, parsed.data, session?.email ?? "System");
     if (result === "not-found") return fail("Menu not found", 404);
     if (result === "parent-not-found") return fail("Parent menu not found", 400);
-    if (result === "invalid-parent") return fail("Parent must be a main menu without sub menus of its own", 400);
+    if (result === "invalid-parent") return fail("A menu cannot be its own parent or the child of its own sub menu", 400);
     return ok(result);
   } catch (err) {
     return handleError(err);

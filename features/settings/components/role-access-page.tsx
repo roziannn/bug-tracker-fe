@@ -120,7 +120,7 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
 
                     return (
                       <TableRow key={menu.id}>
-                        <TableCell className={depth ? "pl-10" : undefined}>{menu.label}</TableCell>
+                        <TableCell style={depth ? { paddingLeft: 8 + depth * 24 } : undefined}>{menu.label}</TableCell>
                         <TableCell className="text-muted-foreground">{parent?.label ?? "-"}</TableCell>
                         <TableCell>{sequence}</TableCell>
                         <TableCell>

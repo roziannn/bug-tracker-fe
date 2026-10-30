@@ -42,7 +42,12 @@ export async function getUserById(id: number): Promise<User | null> {
 
 export async function getUserForAuth(email: string) {
   const rows = await query<User & { Password: string }>(
-    `SELECT "Id", "Name", "Email", "Password", "IsActive" FROM "CORE_User" WHERE "Email" = $1`,
+    `SELECT u."Id", u."Name", u."Email", u."Password", u."IsActive", rc."RoleId" AS "RoleId"
+     FROM "CORE_User" u
+     LEFT JOIN LATERAL (
+       SELECT "RoleId" FROM "CORE_RoleClaim" WHERE "Email" = u."Email" ORDER BY "Id" LIMIT 1
+     ) rc ON true
+     WHERE lower(u."Email") = lower($1)`,
     [email]
   );
   return rows[0] ?? null;

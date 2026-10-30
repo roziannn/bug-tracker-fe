@@ -7,7 +7,8 @@ CRUD untuk menu sidebar, tersimpan di database. Menu ini juga menjadi daftar men
 ## Fitur
 
 - Tambah, edit, dan hapus menu.
-- Sub menu (dua tingkat): pilih **Parent** saat menambah atau mengedit.
+- Sub menu **bertingkat tanpa batas** (menu, sub menu, sub sub menu, dan seterusnya): pilih **Parent** saat menambah atau mengedit. Pilihan Parent menampilkan jalurnya, contoh `Settings › Kategori`.
+- Di tabel, sub menu digambar dengan garis pohon (├ dan └) yang menghubungkan ke parent-nya.
 - Button / function per menu (contoh: Create issue, Export).
 - Ubah urutan dengan tombol naik dan turun, per grup (menu utama atau sub menu dalam satu parent).
 - Switch **Visible** untuk menampilkan atau menyembunyikan menu.
@@ -27,7 +28,7 @@ Didefinisikan di [db/schema/core.ts](../db/schema/core.ts).
 | `Name` | varchar(100) | nama menu |
 | `Path` | varchar(255) | URL, contoh `/issues` |
 | `Icon` | varchar(50) | nama ikon, contoh `Gauge` |
-| `ParentId` | integer, nullable | menu induk. Kosong berarti menu utama. Hapus parent ikut menghapus sub menunya |
+| `ParentId` | integer, nullable | menu induk. Kosong berarti menu utama. Hapus parent ikut menghapus seluruh turunannya |
 | `Sequence` | integer | urutan di dalam grupnya |
 | `IsVisible` | boolean | tampil atau sembunyi |
 | `IsActive`, `CreatedBy`, `CreatedDate`, `UpdatedBy`, `UpdatedDate` | | kolom audit standar |
@@ -45,8 +46,9 @@ Didefinisikan di [db/schema/core.ts](../db/schema/core.ts).
 ## Aturan
 
 - **Code dibuat otomatis** dari nama (huruf kecil, spasi jadi `-`). Kalau sudah dipakai, ditambah angka (`reports`, `reports-2`). Code tidak berubah walau nama menu diubah, supaya akses role yang sudah diatur tidak putus.
-- **Hanya dua tingkat.** Parent harus menu utama. Menu yang sudah punya sub menu tidak bisa dijadikan sub menu.
-- Pindah parent berarti menu masuk ke urutan paling bawah di grup barunya.
+- **Parent boleh menu mana pun**, kecuali menu itu sendiri dan turunannya (sub menu, sub sub menu, dan seterusnya). Aturan ini mencegah menu saling menjadi anak (melingkar). Pilihan yang tidak boleh tidak muncul di dropdown Parent, dan server menolaknya dengan status 400.
+- Pindah parent berarti menu (beserta turunannya) masuk ke urutan paling bawah di grup barunya.
+- Saat parent dipilih, **Path** terisi awalan path parent (contoh `/settings/`) dan **Icon** menjadi `None`, selama keduanya belum kamu ubah sendiri.
 - Saat edit, button yang tidak ada lagi di daftar akan dihapus, dan button yang sudah ada hanya diganti namanya (Code tetap).
 - Hapus menu meminta konfirmasi, karena sub menu dan button-nya ikut terhapus.
 
@@ -83,7 +85,7 @@ Error:
 
 | Status | Penyebab |
 |--------|----------|
-| 400 | nama kosong, parent tidak ditemukan, atau parent tidak valid |
+| 400 | nama kosong, parent tidak ditemukan, atau parent tidak valid (dirinya sendiri atau turunannya) |
 | 404 | menu tidak ditemukan |
 | 500 | kesalahan server |
 
@@ -118,4 +120,4 @@ Kalau menu atau button dihapus, akses lama yang menunjuk ke `Code` itu diabaikan
 
 ## Belum dilakukan
 
-Sidebar aplikasi belum membaca tabel ini. Menu di sidebar masih tetap, jadi mengubah menu di sini belum mengubah tampilan sidebar.
+Sidebar aplikasi belum membaca tabel ini, dan belum menampilkan menu bertingkat. Menu di sidebar masih tetap, jadi mengubah menu di sini belum mengubah tampilan sidebar.

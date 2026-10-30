@@ -1,10 +1,11 @@
 "use client";
 
-// import { useIdleLogout } from "@/hooks/use-idle-logout";
+import { usePathname } from "next/navigation";
+import { useIdleLogout } from "@/hooks/use-idle-logout";
 
 export function IdleLogoutWatcher() {
-  // TEMP: dinonaktifkan sementara selama auth dimatikan (tidak ada session,
-  // sehingga /api/auth/refresh 401 dan memicu logout ke /login).
-  // useIdleLogout();
+  const pathname = usePathname();
+  // Di halaman login belum ada sesi, jadi refresh pasti 401 dan memicu logout berulang.
+  useIdleLogout(pathname !== "/login");
   return null;
 }

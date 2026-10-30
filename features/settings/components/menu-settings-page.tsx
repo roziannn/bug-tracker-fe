@@ -19,14 +19,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import type { MenuNode } from "@/features/settings/data/access-catalog";
-import { fetchMenus, orderMenus } from "@/features/settings/data/menu-store";
+import { descendantIds, fetchMenus, menuTrail, orderMenus, treeGuides } from "@/features/settings/data/menu-store";
 import { getMenuIcon, menuIcons, NO_ICON } from "@/features/settings/data/menu-icons";
 import { appToast } from "@/lib/app-toast";
 import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 const ROOT = "none";
+
+// Button standar yang tinggal dicentang saat membuat menu.
+const PRESET_BUTTONS = ["Add", "Edit", "View", "Delete"];
 const COLUMNS = 8;
+
+// Ukuran garis pohon di kolom Menu (px). GUIDE_START = tengah ikon parent, supaya garis tepat di bawahnya.
+const GUIDE_START = 24;
+const GUIDE_STEP = 24;
+const GUIDE_ELBOW = 16;
 
 type Draft = {
   id: string | null;
@@ -54,9 +62,11 @@ export function MenuSettingsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<MenuNode | null>(null);
   const rows = orderMenus(menus);
-  const parents = menus.filter((menu) => !menu.parentId && menu.id !== draft?.id);
-  // Menu yang sudah punya sub menu tidak bisa dijadikan sub menu.
-  const draftHasChildren = draft?.id ? menus.some((menu) => menu.parentId === draft.id) : false;
+  // Parent bisa menu mana pun, kecuali menu itu sendiri dan turunannya (supaya tidak melingkar).
+  const blockedIds = new Set(draft?.id ? [draft.id, ...descendantIds(menus, draft.id)] : []);
+  const parentOptions = rows
+    .filter(({ menu }) => !blockedIds.has(menu.id))
+    .map(({ menu }) => ({ value: menu.id, label: menuTrail(menus, menu.id) }));
 
   const loadMenus = useCallback(async () => {
     try {
@@ -136,11 +146,27 @@ export function MenuSettingsPage() {
     setDraft({ ...draft, parentId, path: untouched ? newPrefix : draft.path, icon });
   }
 
+  function hasButton(label: string) {
+    return !!draft?.actions.some((action) => action.label.toLowerCase() === label.toLowerCase());
+  }
+
+  function togglePresetButton(label: string, checked: boolean) {
+    if (!draft) return;
+
+    setDraft({
+      ...draft,
+      actions: checked
+        ? [...draft.actions, { label }]
+        : draft.actions.filter((action) => action.label.toLowerCase() !== label.toLowerCase()),
+    });
+  }
+
   function addDraftButton() {
     const name = buttonName.trim();
     if (!name || !draft) return;
 
-    setDraft({ ...draft, actions: [...draft.actions, { label: name }] });
+    // Nama yang sudah ada tidak ditambah dua kali.
+    if (!hasButton(name)) setDraft({ ...draft, actions: [...draft.actions, { label: name }] });
     setButtonName("");
   }
 
@@ -234,8 +260,29 @@ export function MenuSettingsPage() {
 
                 return (
                   <TableRow key={menu.id} className={cn(!menu.visible && "opacity-60")}>
-                    <TableCell>
-                      <div className={cn("flex items-center gap-3 font-medium", depth && "pl-8")}>
+                    <TableCell className="relative">
+                      {treeGuides(menus, menu).map((isLast, index) => {
+                        const own = index === depth - 1;
+                        const left = GUIDE_START + index * GUIDE_STEP;
+
+                        // Ancestor yang masih punya adik di bawah: garis lurus. Menu ini sendiri: siku (├ atau └).
+                        if (!own && isLast) return null;
+                        return (
+                          <span key={index} aria-hidden="true">
+                            <span
+                              className="absolute top-0 w-px bg-border"
+                              style={{ left, bottom: own && isLast ? "50%" : 0 }}
+                            />
+                            {own ? (
+                              <span className="absolute top-1/2 h-px bg-border" style={{ left, width: GUIDE_ELBOW }} />
+                            ) : null}
+                          </span>
+                        );
+                      })}
+                      <div
+                        className="flex items-center gap-3 font-medium"
+                        style={{ paddingLeft: depth ? depth * GUIDE_STEP + 8 : 0 }}
+                      >
                         {Icon ? (
                           <span className="flex size-8 items-center justify-center rounded-lg bg-muted">
                             <Icon className="size-4" />
@@ -328,7 +375,7 @@ export function MenuSettingsPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{draft?.id ? "Edit menu" : "Add menu"}</DialogTitle>
-            <DialogDescription>Choose a parent to create a sub menu, and add the buttons available in this menu.</DialogDescription>
+            <DialogDescription>Choose a parent to create a sub menu (any level), and add the buttons available in this menu.</DialogDescription>
           </DialogHeader>
 
           {draft ? (
@@ -348,8 +395,7 @@ export function MenuSettingsPage() {
                 <label className="text-sm font-medium">Parent</label>
                 <Select
                   value={draft.parentId}
-                  disabled={draftHasChildren}
-                  items={[{ value: ROOT, label: "No parent" }, ...parents.map((menu) => ({ value: menu.id, label: menu.label }))]}
+                  items={[{ value: ROOT, label: "No parent" }, ...parentOptions]}
                   onValueChange={(value) => changeParent(value ?? ROOT)}
                 >
                   <SelectTrigger className="w-full">
@@ -357,16 +403,13 @@ export function MenuSettingsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ROOT}>No parent</SelectItem>
-                    {parents.map((menu) => (
-                      <SelectItem key={menu.id} value={menu.id}>
-                        {menu.label}
+                    {parentOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {draftHasChildren ? (
-                  <p className="text-xs text-muted-foreground">This menu has sub menus, so it must stay a main menu.</p>
-                ) : null}
               </div>
               <div className="grid gap-2">
                 <label htmlFor="menu-path" className="text-sm font-medium">
@@ -398,20 +441,35 @@ export function MenuSettingsPage() {
 
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Buttons</label>
-                {draft.actions.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_BUTTONS.map((label) => (
+                    <label key={label} className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm">
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-primary"
+                        checked={hasButton(label)}
+                        onChange={(event) => togglePresetButton(label, event.target.checked)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {draft.actions.some((action) => !PRESET_BUTTONS.includes(action.label)) ? (
                   <div className="flex flex-wrap gap-2">
-                    {draft.actions.map((action, index) => (
-                      <span key={action.id ?? `new-${index}`} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
-                        {action.label}
-                        <button
-                          type="button"
-                          aria-label={`Remove ${action.label}`}
-                          onClick={() => setDraft({ ...draft, actions: draft.actions.filter((_, i) => i !== index) })}
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    ))}
+                    {draft.actions.map((action, index) =>
+                      PRESET_BUTTONS.includes(action.label) ? null : (
+                        <span key={action.id ?? `new-${index}`} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
+                          {action.label}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${action.label}`}
+                            onClick={() => setDraft({ ...draft, actions: draft.actions.filter((_, i) => i !== index) })}
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </span>
+                      )
+                    )}
                   </div>
                 ) : null}
                 <div className="flex gap-2">
@@ -420,7 +478,7 @@ export function MenuSettingsPage() {
                     maxLength={100}
                     onChange={(event) => setButtonName(event.target.value)}
                     onKeyDown={(event) => event.key === "Enter" && addDraftButton()}
-                    placeholder="Button name, e.g. Export"
+                    placeholder="Other button, e.g. Export"
                   />
                   <Button variant="outline" onClick={addDraftButton}>
                     <Plus />

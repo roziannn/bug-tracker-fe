@@ -79,17 +79,21 @@ type ParentResult = { id: number | null; error?: undefined } | { id?: undefined;
 async function resolveParent(client: PoolClient, parentCode: string | null, selfId: number | null): Promise<ParentResult> {
   if (!parentCode) return { id: null };
 
-  const parent = await client.query<{ Id: number; ParentId: number | null }>(
-    `SELECT "Id", "ParentId" FROM "CORE_Menu" WHERE "Code" = $1`,
-    [parentCode]
-  );
+  const parent = await client.query<{ Id: number }>(`SELECT "Id" FROM "CORE_Menu" WHERE "Code" = $1`, [parentCode]);
   if (!parent.rows[0]) return { error: "parent-not-found" };
 
-  // Hanya dua tingkat: parent harus menu utama, dan menu yang punya sub menu tidak boleh jadi sub menu.
-  if (parent.rows[0].ParentId !== null || parent.rows[0].Id === selfId) return { error: "invalid-parent" };
+  // Bertingkat tanpa batas, tapi menu tidak boleh jadi anak dari dirinya sendiri atau turunannya (melingkar).
   if (selfId !== null) {
-    const children = await client.query(`SELECT 1 FROM "CORE_Menu" WHERE "ParentId" = $1 LIMIT 1`, [selfId]);
-    if (children.rowCount) return { error: "invalid-parent" };
+    const cycle = await client.query(
+      `WITH RECURSIVE tree AS (
+         SELECT "Id" FROM "CORE_Menu" WHERE "Id" = $1
+         UNION ALL
+         SELECT m."Id" FROM "CORE_Menu" m JOIN tree t ON m."ParentId" = t."Id"
+       )
+       SELECT 1 FROM tree WHERE "Id" = $2`,
+      [selfId, parent.rows[0].Id]
+    );
+    if (cycle.rowCount) return { error: "invalid-parent" };
   }
   return { id: parent.rows[0].Id };
 }

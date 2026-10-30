@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useCurrentUser } from "@/components/app/user-provider";
 import { appToast } from "@/lib/app-toast";
 
 const highlights = [
@@ -33,6 +34,7 @@ const highlights = [
 
 export function LoginPage() {
   const router = useRouter();
+  const { refreshUser } = useCurrentUser();
   const [isPending, startTransition] = useTransition();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,12 +42,7 @@ export function LoginPage() {
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    // TEMP: auth dinonaktifkan sementara, langsung ke dashboard.
-    // Hapus baris di bawah dan uncomment blok startTransition untuk mengaktifkan lagi.
-    router.push("/");
-    return;
-
-    /* startTransition(async () => {
+    startTransition(async () => {
       try {
         const res = await fetch("/api/auth/login", {
           method: "POST",
@@ -53,16 +50,17 @@ export function LoginPage() {
           body: JSON.stringify({ email, password }),
         });
 
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
 
         if (!res.ok) {
           appToast.error({
-            title: "Login gagal",
-            description: data.error ?? "Terjadi kesalahan, coba lagi.",
+            title: "Login failed",
+            description: data?.error ?? "Something went wrong, please try again.",
           });
           return;
         }
 
+        await refreshUser();
         appToast.success({
           title: "Login successful",
           description: `Welcome back, ${data.user.name}. Redirecting to your workspace.`,
@@ -72,11 +70,11 @@ export function LoginPage() {
         router.refresh();
       } catch {
         appToast.error({
-          title: "Login gagal",
-          description: "Tidak bisa terhubung ke server, coba lagi.",
+          title: "Login failed",
+          description: "Unable to reach the server, please try again.",
         });
       }
-    }); */
+    });
   }
 
   return (
