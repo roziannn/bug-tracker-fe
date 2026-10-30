@@ -40,7 +40,7 @@ type Draft = {
 // Path awal untuk sub menu: path parent + "/", supaya tinggal dilanjutkan (mis. "/settings/" lalu "menu").
 function parentPathPrefix(parent: MenuNode | undefined) {
   if (!parent?.path) return "";
-  return `${parent.path.replace(//+$/, "")}/`;
+  return `${parent.path.replace(/\/+$/, "")}/`;
 }
 
 const emptyDraft: Draft = { id: null, label: "", path: "", icon: "Circle", parentId: ROOT, actions: [] };
@@ -128,7 +128,12 @@ export function MenuSettingsPage() {
 
     // Path hanya diganti kalau masih kosong atau masih berupa awalan parent lama (belum diketik sendiri).
     const untouched = path === "" || (oldPrefix !== "" && path === oldPrefix);
-    setDraft({ ...draft, parentId, path: untouched ? newPrefix : draft.path });
+    // Sub menu defaultnya tanpa ikon, menu utama defaultnya Circle. Ikon yang sudah dipilih sendiri tidak diubah.
+    const oldDefaultIcon = draft.parentId === ROOT ? "Circle" : NO_ICON;
+    const newDefaultIcon = parentId === ROOT ? "Circle" : NO_ICON;
+    const icon = draft.icon === oldDefaultIcon ? newDefaultIcon : draft.icon;
+
+    setDraft({ ...draft, parentId, path: untouched ? newPrefix : draft.path, icon });
   }
 
   function addDraftButton() {
