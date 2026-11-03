@@ -1,0 +1,104 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793188169341,
+      "tag": "0000_lonely_blur",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793324501623,
+      "tag": "0001_lonely_kat_farrell",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793351680724,
+      "tag": "0002_calm_mongoose",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793670882312,
+      "tag": "0003_big_colleen_wing",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793672413911,
+      "tag": "0004_tranquil_moonstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793674769388,
+      "tag": "0005_massive_jamie_braddock",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793677133018,
+      "tag": "0006_graceful_misty_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793677948037,
+      "tag": "0007_reflective_gabe_jones",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793680716237,
+      "tag": "0008_pale_impossible_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793690000000,
+      "tag": "0009_create_issues",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793691000000,
+      "tag": "0010_issue_discussion_solution",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793692000000,
+      "tag": "0011_issue_activity",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793693000000,
+      "tag": "0012_issue_comment_replies",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793694000000,
+      "tag": "0013_create_kanban",
+      "breakpoints": true
+    }
+  ]
+}

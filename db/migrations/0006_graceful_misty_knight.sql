@@ -1,0 +1,1 @@
+ALTER TABLE "DATA_Projects" ADD COLUMN "Priority" varchar(10) DEFAULT 'Medium' NOT NULL;

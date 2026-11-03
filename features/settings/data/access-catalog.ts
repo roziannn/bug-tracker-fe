@@ -1,13 +1,19 @@
-export type AccessMenu = {
+export type MenuNode = {
   id: string;
   label: string;
+  parentId: string | null;
+  path: string;
+  icon: string;
+  visible: boolean;
   actions: { id: string; label: string }[];
+  CreatedBy?: string | null;
+  CreatedDate?: string;
 };
 
-export const accessCatalog: AccessMenu[] = [
-  { id: "overview", label: "Overview", actions: [] },
+const rootMenus = [
+  { id: "overview", path: "/", icon: "Gauge", label: "Overview", actions: [] },
   {
-    id: "issues",
+    id: "issues", path: "/issues", icon: "CircleDot",
     label: "All Issues",
     actions: [
       { id: "issues.create", label: "Create issue" },
@@ -16,9 +22,9 @@ export const accessCatalog: AccessMenu[] = [
       { id: "issues.export", label: "Export" },
     ],
   },
-  { id: "kanban", label: "Kanban", actions: [{ id: "kanban.move", label: "Move card" }] },
+  { id: "kanban", path: "/kanban", icon: "KanbanSquare", label: "Kanban", actions: [{ id: "kanban.move", label: "Move card" }] },
   {
-    id: "teams",
+    id: "teams", path: "/teams", icon: "Users",
     label: "Teams",
     actions: [
       { id: "teams.manage-groups", label: "Create / edit group" },
@@ -26,20 +32,29 @@ export const accessCatalog: AccessMenu[] = [
     ],
   },
   {
-    id: "projects",
+    id: "projects", path: "/projects", icon: "FolderOpenDot",
     label: "Projects",
     actions: [
       { id: "projects.create", label: "Create project" },
       { id: "projects.export", label: "Export" },
     ],
   },
-  { id: "audit-trail", label: "Audit Trail", actions: [{ id: "audit-trail.export", label: "Export" }] },
+  { id: "audit-trail", path: "/audit-trail", icon: "FileSearch2", label: "Audit Trail", actions: [{ id: "audit-trail.export", label: "Export" }] },
   {
-    id: "settings",
+    id: "settings", path: "/settings/role", icon: "Settings",
     label: "Settings",
     actions: [
       { id: "settings.manage-roles", label: "Manage roles" },
       { id: "settings.manage-environment", label: "Manage environment" },
     ],
   },
-];
+  { id: "settings-categories", path: "/settings/category", icon: "FolderOpenDot", label: "Categories", parentId: "settings", actions: [] },
+  { id: "settings-issue-classification", path: "/settings/category/issue-classification", icon: "CircleDot", label: "Issue Classification", parentId: "settings-categories", actions: [] },
+] as const;
+
+export const defaultMenus: MenuNode[] = rootMenus.map((menu) => ({
+  ...menu,
+  parentId: "parentId" in menu ? menu.parentId : null,
+  visible: true,
+  actions: [...menu.actions],
+}));

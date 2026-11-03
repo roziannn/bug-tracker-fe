@@ -1,0 +1,123 @@
+# Menu
+
+Menu: **Settings → Menu** (`/settings/menu`)
+
+CRUD untuk menu sidebar, tersimpan di database. Menu ini juga menjadi daftar menu dan button yang diatur di halaman **Configure access** milik tiap role.
+
+## Fitur
+
+- Tambah, edit, dan hapus menu.
+- Sub menu **bertingkat tanpa batas** (menu, sub menu, sub sub menu, dan seterusnya): pilih **Parent** saat menambah atau mengedit. Pilihan Parent menampilkan jalurnya, contoh `Settings › Kategori`.
+- Di tabel, sub menu digambar dengan garis pohon (├ dan └) yang menghubungkan ke parent-nya.
+- Button / function per menu (contoh: Create issue, Export).
+- Ubah urutan dengan tombol naik dan turun, per grup (menu utama atau sub menu dalam satu parent).
+- Switch **Visible** untuk menampilkan atau menyembunyikan menu.
+- Kolom **Created by** dan **Created date**. Kalau kosong, Created by tampil "System".
+- Skeleton saat data dimuat. Tidak ada pagination, semua menu tampil dan halaman discroll.
+
+## Tabel
+
+Didefinisikan di [db/schema/core.ts](../db/schema/core.ts).
+
+### `CORE_Menu`
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `Id` | integer, identity | primary key |
+| `Code` | varchar(150) | unik, id teks yang dipakai role access (contoh `issues`). Dibuat otomatis dari nama |
+| `Name` | varchar(100) | nama menu |
+| `Path` | varchar(255) | URL, contoh `/issues` |
+| `Icon` | varchar(50) | nama ikon, contoh `Gauge` |
+| `ParentId` | integer, nullable | menu induk. Kosong berarti menu utama. Hapus parent ikut menghapus seluruh turunannya |
+| `Sequence` | integer | urutan di dalam grupnya |
+| `IsVisible` | boolean | tampil atau sembunyi |
+| `IsActive`, `CreatedBy`, `CreatedDate`, `UpdatedBy`, `UpdatedDate` | | kolom audit standar |
+
+### `CORE_MenuAction`
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `Id` | integer, identity | primary key |
+| `MenuId` | integer | menu pemilik. Hapus menu ikut menghapus button-nya |
+| `Code` | varchar(200) | unik, contoh `issues.create` |
+| `Name` | varchar(100) | nama button |
+| kolom audit | | sama seperti di atas |
+
+## Aturan
+
+- **Code dibuat otomatis** dari nama (huruf kecil, spasi jadi `-`). Kalau sudah dipakai, ditambah angka (`reports`, `reports-2`). Code tidak berubah walau nama menu diubah, supaya akses role yang sudah diatur tidak putus.
+- **Parent boleh menu mana pun**, kecuali menu itu sendiri dan turunannya (sub menu, sub sub menu, dan seterusnya). Aturan ini mencegah menu saling menjadi anak (melingkar). Pilihan yang tidak boleh tidak muncul di dropdown Parent, dan server menolaknya dengan status 400.
+- Pindah parent berarti menu (beserta turunannya) masuk ke urutan paling bawah di grup barunya.
+- Saat parent dipilih, **Path** terisi awalan path parent (contoh `/settings/`) dan **Icon** menjadi `None`, selama keduanya belum kamu ubah sendiri.
+- Saat edit, button yang tidak ada lagi di daftar akan dihapus, dan button yang sudah ada hanya diganti namanya (Code tetap).
+- Hapus menu meminta konfirmasi, karena sub menu dan button-nya ikut terhapus.
+
+## API
+
+| Method | URL | Fungsi |
+|--------|-----|--------|
+| `GET` | `/api/menus` | semua menu, urut per grup |
+| `POST` | `/api/menus` | tambah menu |
+| `GET` | `/api/menus/:code` | satu menu |
+| `PUT` | `/api/menus/:code` | ubah menu beserta daftar button-nya |
+| `PATCH` | `/api/menus/:code` | ubah tampil/sembunyi |
+| `DELETE` | `/api/menus/:code` | hapus menu (beserta sub menu dan button) |
+| `POST` | `/api/menus/:code/move` | geser urutan |
+
+Body `POST` dan `PUT`:
+
+```json
+{
+  "label": "Reports",
+  "path": "/reports",
+  "icon": "Gauge",
+  "parentId": null,
+  "actions": [{ "label": "Export" }, { "id": "reports.print", "label": "Print" }]
+}
+```
+
+- `parentId` berisi `Code` parent, atau `null` untuk menu utama.
+- Di `actions`, isi `id` untuk button yang sudah ada. Tanpa `id` berarti button baru.
+
+Body `PATCH`: `{ "visible": false }`. Body `move`: `{ "direction": -1 }` (naik) atau `{ "direction": 1 }` (turun).
+
+Error:
+
+| Status | Penyebab |
+|--------|----------|
+| 400 | nama kosong, parent tidak ditemukan, atau parent tidak valid (dirinya sendiri atau turunannya) |
+| 404 | menu tidak ditemukan |
+| 500 | kesalahan server |
+
+## Memuat menu bawaan
+
+Tabel baru kosong. Untuk mengisi dengan menu bawaan (Overview, All Issues, Kanban, Teams, Projects, Audit Trail, Settings beserta button-nya):
+
+```
+pnpm seed-menu
+```
+
+Aman dijalankan berulang. Menu yang `Code`-nya sudah ada dilewati.
+
+## Hubungan dengan Role
+
+Halaman [Role](Role.md) dan **Configure access** membaca daftar menu dan button dari `/api/menus`. Izin per role disimpan di database (`CORE_RoleMenu`, `CORE_RoleMenuAction`) dan dipakai untuk membangun sidebar, lihat [Sidebar](Sidebar.md).
+
+Kalau menu atau button dihapus, izin yang menunjuk ke sana ikut terhapus (cascade).
+
+## Letak kode
+
+| File | Isi |
+|------|-----|
+| [db/schema/core.ts](../db/schema/core.ts) | tabel `CORE_Menu`, `CORE_MenuAction` |
+| [repositories/menu.repository.ts](../repositories/menu.repository.ts) | query, transaksi, aturan parent dan urutan |
+| [lib/validation.ts](../lib/validation.ts) | `menuSchema`, `menuVisibleSchema`, `menuMoveSchema` |
+| [app/api/menus/](../app/api/menus) | route API |
+| [features/settings/components/menu-settings-page.tsx](../features/settings/components/menu-settings-page.tsx) | halaman |
+| [features/settings/data/menu-store.ts](../features/settings/data/menu-store.ts) | `fetchMenus`, `orderMenus` |
+| [components/ui/table-skeleton.tsx](../components/ui/table-skeleton.tsx) | skeleton tabel |
+| [scripts/seed-menu.ts](../scripts/seed-menu.ts) | seed menu bawaan |
+
+## Sidebar
+
+Sidebar aplikasi dibangun dari tabel ini, difilter berdasarkan role user yang login. Detailnya ada di [Sidebar](Sidebar.md).

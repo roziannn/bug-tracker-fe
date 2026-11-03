@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Activity, Download, Lock, Search, ShieldCheck, ShieldX } from "lucide-react";
+import { formatDateTime } from "@/lib/date";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,10 +47,7 @@ const stats = [
 ] as const;
 
 function formatTimestamp(dateString: string) {
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(dateString));
+  return formatDateTime(dateString);
 }
 
 function outcomeVariant(outcome: AuditTrailOutcome): "default" | "secondary" | "destructive" {

@@ -28,6 +28,8 @@ import {
   priorityVariant,
 } from "@/features/bug-tracker/data/bug-tracker-data";
 import { appToast } from "@/lib/app-toast";
+import { formatDate } from "@/lib/date";
+import { DatabaseIssueDetailPage } from "@/features/issues/components/database-issue-detail-page";
 
 const issueStatusOptions = ["Backlog", "Ready", "Investigating", "In review", "Done"] as const;
 
@@ -60,11 +62,7 @@ function formatFileSize(size: number) {
 }
 
 function formatHistoryDate(dateString: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(dateString));
+  return formatDate(dateString);
 }
 
 const issueEvidence = {
@@ -290,7 +288,7 @@ export function IssueDetailPage({ id }: { id: string }) {
     });
   }
 
-  function handlePendingStatusChange(value: (typeof issueStatusOptions)[number] | null) {
+  function handlePendingStatusChange(value: string | null) {
     if (!value) {
       return;
     }
@@ -354,29 +352,7 @@ export function IssueDetailPage({ id }: { id: string }) {
   }
 
   if (!issue) {
-    return (
-      <AppShell
-        activeNav="issues"
-        breadcrumbs={[
-          { label: "All Issues", href: "/issues" },
-          { label: "Issue Not Found" },
-        ]}
-        eyebrow="Issue detail"
-        title="Issue Not Found"
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>Issue not found</CardTitle>
-            <CardDescription>Issue dengan id `{id}` belum ada di source data saat ini.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button nativeButton={false} render={<Link href="/issues" />} variant="outline">
-              Back to issues
-            </Button>
-          </CardContent>
-        </Card>
-      </AppShell>
-    );
+    return <DatabaseIssueDetailPage id={id} />;
   }
 
   return (

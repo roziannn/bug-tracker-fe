@@ -14,12 +14,12 @@ export async function POST(req: NextRequest) {
     }
 
     const { email, password } = parsed.data;
-    const genericError = NextResponse.json({ error: "Email atau password salah" }, { status: 401 });
+    const genericError = NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
 
     const user = await getUserForAuth(email);
     if (!user) return genericError;
     if (!user.IsActive) {
-      return NextResponse.json({ error: "Akun tidak aktif, hubungi admin" }, { status: 403 });
+      return NextResponse.json({ error: "Your account is inactive, please contact an administrator" }, { status: 403 });
     }
 
     const valid = await verifyPassword(password, user.Password);
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       userId: user.Id,
       email: user.Email,
       name: user.Name,
-      roleId: 0,
+      roleId: user.RoleId ?? 0,
     });
 
     return NextResponse.json({ ok: true, user: { id: user.Id, name: user.Name, email: user.Email } });

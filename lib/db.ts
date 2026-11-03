@@ -1,15 +1,13 @@
 import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+import * as schema from "@/db/schema";
 
 const g = globalThis as unknown as { __pgPool?: Pool };
 
 export function getPool(): Pool {
   if (!g.__pgPool) {
     g.__pgPool = new Pool({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT) || 5432,
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
+      connectionString: process.env.DATABASE_URL,
       max: 10,
       idleTimeoutMillis: 30000,
     });
@@ -21,8 +19,9 @@ export function getPool(): Pool {
   return g.__pgPool;
 }
 
+export const db = drizzle(getPool(), { schema });
+
 export async function query<T = any>(text: string, params: any[] = []): Promise<T[]> {
-  const pool = getPool();
-  const result = await pool.query(text, params);
+  const result = await getPool().query(text, params);
   return result.rows as T[];
 }

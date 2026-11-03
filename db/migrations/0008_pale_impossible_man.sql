@@ -1,0 +1,1 @@
+ALTER TABLE "CORE_TeamMember" DROP COLUMN "Role";

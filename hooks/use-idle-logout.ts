@@ -7,12 +7,14 @@ const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const REFRESH_THROTTLE_MS = 60 * 1000; 
 const ACTIVITY_EVENTS = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"] as const;
 
-export function useIdleLogout() {
+export function useIdleLogout(enabled = true) {
   const router = useRouter();
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRefreshRef = useRef<number>(0);
 
   useEffect(() => {
+    if (!enabled) return;
+
     async function logout() {
       await fetch("/api/auth/logout", { method: "POST" });
       router.push("/login");
@@ -46,5 +48,5 @@ export function useIdleLogout() {
       ACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, handleActivity));
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, [router]);
+  }, [router, enabled]);
 }
