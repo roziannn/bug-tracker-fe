@@ -65,7 +65,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const id = parseId((await params).id);
     if (!id) return fail("Invalid id", 400);
 
-    return (await deleteCategoryItem(id)) ? ok({ ok: true }) : fail("Category item not found", 404);
+    const result = await deleteCategoryItem(id);
+    if (result === "in-use") return fail("This value is in use by a group team. Switch it to inactive instead of deleting it.", 409);
+    return result ? ok({ ok: true }) : fail("Category item not found", 404);
   } catch (err) {
     return handleError(err);
   }

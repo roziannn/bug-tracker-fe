@@ -116,3 +116,38 @@ export const coreCategory = pgTable(
   },
   (t) => [uniqueIndex("CORE_Category_CategoryName_Name_key").on(t.CategoryName, t.Name)]
 );
+
+// Group team. Satu group per Teams Domain (CORE_Category), jadi domain-nya sekaligus menjadi nama group.
+export const coreTeam = pgTable("CORE_Team", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  // ID bergaya GUID yang dipakai di URL.
+  NewId: uuid("NewId").notNull().defaultRandom().unique(),
+  DomainId: integer("DomainId")
+    .notNull()
+    .unique()
+    .references(() => coreCategory.Id, { onDelete: "restrict" }),
+  LeadId: integer("LeadId")
+    .notNull()
+    .references(() => coreUser.Id, { onDelete: "restrict" }),
+  ...auditColumns,
+});
+
+// Anggota group team. Anggotanya adalah user (CORE_User).
+export const coreTeamMember = pgTable(
+  "CORE_TeamMember",
+  {
+    Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+    TeamId: integer("TeamId")
+      .notNull()
+      .references(() => coreTeam.Id, { onDelete: "cascade" }),
+    UserId: integer("UserId")
+      .notNull()
+      .references(() => coreUser.Id, { onDelete: "restrict" }),
+    // Admin, Lead, Engineer, atau QA (lihat features/teams/data/team-options.ts).
+    Role: varchar("Role", { length: 20 }).notNull().default("Engineer"),
+    // member, lead, atau observer.
+    AccessLevel: varchar("AccessLevel", { length: 20 }).notNull().default("member"),
+    ...auditColumns,
+  },
+  (t) => [uniqueIndex("CORE_TeamMember_TeamId_UserId_key").on(t.TeamId, t.UserId)]
+);

@@ -65,7 +65,15 @@ export async function setCategoryItemActive(id: number, isActive: boolean, updat
   return rows[0] ?? "not-found";
 }
 
-export async function deleteCategoryItem(id: number): Promise<boolean> {
-  const rows = await query(`DELETE FROM "CORE_Category" WHERE "Id" = $1 RETURNING "Id"`, [id]);
-  return rows.length > 0;
+// "in-use": nilai ini dipakai data lain yang melarang penghapusan (mis. group team memakainya sebagai domain).
+export async function deleteCategoryItem(id: number): Promise<boolean | "in-use"> {
+  try {
+    const rows = await query(`DELETE FROM "CORE_Category" WHERE "Id" = $1 RETURNING "Id"`, [id]);
+    return rows.length > 0;
+  } catch (err) {
+    // 23001 = RESTRICT dilanggar (group team memakai nilai ini), 23503 = foreign key lain yang menahan.
+    const code = (err as { code?: string }).code;
+    if (code === "23001" || code === "23503") return "in-use";
+    throw err;
+  }
 }

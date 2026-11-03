@@ -122,3 +122,29 @@ export interface ProjectDetail extends AuditFields {
   Repositories: string[];
   Environments: { Environment: string; Url: string }[];
 }
+
+export interface Team extends AuditFields {
+  Id: number;
+  /** ID bergaya GUID, dipakai di URL. */
+  NewId: string;
+  DomainId: number;
+  /** Nama Teams Domain-nya; sekaligus nama group team. */
+  DomainName: string;
+  LeadId: number;
+  LeadName: string;
+  LeadEmail: string;
+  /** Jumlah anggota yang aktif. */
+  MemberCount: number;
+  IsActive: boolean;
+}
+
+export interface TeamMember extends AuditFields {
+  Id: number;
+  TeamId: number;
+  UserId: number;
+  Name: string;
+  Email: string;
+  Role: string;
+  AccessLevel: string;
+  IsActive: boolean;
+}

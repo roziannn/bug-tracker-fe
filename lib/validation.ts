@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { parseDateOnly } from "@/lib/date";
 import { DEFAULT_PRIORITY, PROJECT_PRIORITIES } from "@/features/projects/data/priorities";
+import { ACCESS_LEVELS, DEFAULT_ACCESS_LEVEL, DEFAULT_TEAM_ROLE, TEAM_ROLES } from "@/features/teams/data/team-options";
 
 export const loginSchema = z.object({
   email: z.string().trim().email("Invalid email format"),
@@ -148,3 +149,28 @@ export const createProjectSchema = z
   });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+
+export const teamSchema = z.object({
+  domainId: z.number({ error: "Domain is required" }).int().positive("Domain is required"),
+  leadId: z.number({ error: "Lead is required" }).int().positive("Lead is required"),
+});
+
+export type TeamInput = z.infer<typeof teamSchema>;
+
+export const teamActiveSchema = z.object({ isActive: z.boolean() });
+
+export const createTeamMemberSchema = z.object({
+  userId: z.number({ error: "User is required" }).int().positive("User is required"),
+  role: z.enum(TEAM_ROLES, { error: "Role is not valid" }).default(DEFAULT_TEAM_ROLE),
+  accessLevel: z.enum(ACCESS_LEVELS, { error: "Access level is not valid" }).default(DEFAULT_ACCESS_LEVEL),
+});
+
+export type CreateTeamMemberInput = z.infer<typeof createTeamMemberSchema>;
+
+export const updateTeamMemberSchema = z.object({
+  role: z.enum(TEAM_ROLES, { error: "Role is not valid" }),
+  accessLevel: z.enum(ACCESS_LEVELS, { error: "Access level is not valid" }),
+  isActive: z.boolean().optional(),
+});
+
+export type UpdateTeamMemberInput = z.infer<typeof updateTeamMemberSchema>;
