@@ -10,16 +10,19 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSkeleton,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getMenuIcon } from "@/features/settings/data/menu-icons";
 import { cn } from "@/lib/utils";
 import type { NavMenu } from "@/types";
 
 type TreeNode = NavMenu & { children: TreeNode[] };
+
+// Lebar tetap (bukan acak) supaya hasil render di server dan di browser sama.
+const SKELETON_WIDTHS = ["w-24", "w-32", "w-20", "w-28", "w-24"];
 
 function normalize(path: string) {
   const trimmed = path.trim().replace(/\/+$/, "");
@@ -76,7 +79,10 @@ export function SidebarNavigation() {
       <SidebarMenu>
         {Array.from({ length: 5 }, (_, index) => (
           <SidebarMenuItem key={index}>
-            <SidebarMenuSkeleton showIcon />
+            <div className="flex h-8 items-center gap-2 px-2" aria-hidden="true">
+              <Skeleton className="size-4 shrink-0 rounded-md" />
+              <Skeleton className={`h-4 ${SKELETON_WIDTHS[index % SKELETON_WIDTHS.length]} group-data-[collapsible=icon]:hidden`} />
+            </div>
           </SidebarMenuItem>
         ))}
       </SidebarMenu>

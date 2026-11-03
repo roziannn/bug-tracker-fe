@@ -58,3 +58,14 @@ export interface CurrentUser {
   actions: string[];
   navigation: NavMenu[];
 }
+
+export interface EnvVar extends AuditFields {
+  Id: number;
+  Environment: string;
+  Label: string;
+  Key: string;
+  /** Null untuk variabel secret: nilainya baru dikirim saat diminta (tombol mata / Copy .env). */
+  Value: string | null;
+  IsSecret: boolean;
+  HasValue: boolean;
+}

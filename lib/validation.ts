@@ -58,3 +58,31 @@ export const roleAccessSchema = z.object({
   menus: z.array(z.string()).default([]),
   actions: z.array(z.string()).default([]),
 });
+
+const envKey = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .min(1, "Key is required")
+  .max(100, "Key must be at most 100 characters")
+  .regex(/^[A-Z][A-Z0-9_]*$/, "Key must use uppercase letters, numbers, and underscores, starting with a letter");
+
+export const createEnvVarSchema = z.object({
+  environment: z.string().trim().min(1, "Environment is required").max(50, "Environment must be at most 50 characters"),
+  label: z.string().trim().max(100, "Label must be at most 100 characters").default(""),
+  key: envKey,
+  value: z.string().max(10000, "Value is too long").default(""),
+  isSecret: z.boolean().default(false),
+});
+
+export type CreateEnvVarInput = z.infer<typeof createEnvVarSchema>;
+
+// Saat edit, value yang tidak dikirim berarti nilai lama dipertahankan.
+export const updateEnvVarSchema = z.object({
+  label: z.string().trim().max(100, "Label must be at most 100 characters").default(""),
+  key: envKey,
+  value: z.string().max(10000, "Value is too long").optional(),
+  isSecret: z.boolean().default(false),
+});
+
+export type UpdateEnvVarInput = z.infer<typeof updateEnvVarSchema>;

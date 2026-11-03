@@ -1,5 +1,5 @@
 // Tabel master / settings: prefix CORE_
-import { boolean, integer, pgTable, uuid, varchar, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, text, uuid, varchar, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { auditColumns } from "./_columns";
 
 export const coreRole = pgTable("CORE_Role", {
@@ -86,4 +86,19 @@ export const coreRoleMenuAction = pgTable(
     ...auditColumns,
   },
   (t) => [uniqueIndex("CORE_RoleMenuAction_RoleId_MenuActionId_key").on(t.RoleId, t.MenuActionId)]
+);
+
+// Variabel environment per environment (Development, Staging, Production), sesuai halaman Settings → Environment.
+export const coreEnv = pgTable(
+  "CORE_Env",
+  {
+    Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+    Environment: varchar("Environment", { length: 50 }).notNull(),
+    Label: varchar("Label", { length: 100 }).notNull(),
+    Key: varchar("Key", { length: 100 }).notNull(),
+    Value: text("Value").notNull().default(""),
+    IsSecret: boolean("IsSecret").notNull().default(false),
+    ...auditColumns,
+  },
+  (t) => [uniqueIndex("CORE_Env_Environment_Key_key").on(t.Environment, t.Key)]
 );
