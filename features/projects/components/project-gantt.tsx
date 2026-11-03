@@ -32,7 +32,13 @@ function nextMonthStart(ms: number) {
 }
 
 // Gantt chart sederhana: satu baris per phase, sumbu waktu dibagi per bulan. Hanya menerima phase yang sudah valid.
-export function ProjectGantt({ phases }: { phases: TimelinePhase[] }) {
+export function ProjectGantt({
+  phases,
+  emptyMessage = "Add a phase with a start and end date to see the Gantt chart.",
+}: {
+  phases: TimelinePhase[];
+  emptyMessage?: string;
+}) {
   const chart = useMemo(() => {
     const bars: Bar[] = [];
     phases.forEach((phase, index) => {
@@ -60,7 +66,7 @@ export function ProjectGantt({ phases }: { phases: TimelinePhase[] }) {
   if (!chart) {
     return (
       <p className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
-        Add a phase with a start and end date to see the Gantt chart.
+        {emptyMessage}
       </p>
     );
   }

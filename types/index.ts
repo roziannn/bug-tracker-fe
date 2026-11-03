@@ -86,9 +86,16 @@ export interface Project extends AuditFields {
   OwnerId: number;
   OwnerName: string;
   Description: string;
+  /** Low, Medium, atau High. */
+  Priority: string;
   GoLiveDate: string | null;
   Tags: string[];
   PhaseCount: number;
+  /** Phase timeline, urut sesuai Sequence. Dipakai untuk menentukan status saat ini. */
+  Phases: { Name: string; StartDate: string; EndDate: string }[];
+  /** Tanggal phase paling awal dan paling akhir (YYYY-MM-DD). Null kalau project belum punya phase. */
+  TimelineStart: string | null;
+  TimelineEnd: string | null;
   IsActive: boolean;
 }
 
@@ -107,6 +114,7 @@ export interface ProjectDetail extends AuditFields {
   OwnerId: number;
   OwnerName: string;
   Description: string;
+  Priority: string;
   GoLiveDate: string | null;
   IsActive: boolean;
   Tags: { Id: number; Name: string }[];

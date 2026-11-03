@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parseDateOnly } from "@/lib/date";
+import { DEFAULT_PRIORITY, PROJECT_PRIORITIES } from "@/features/projects/data/priorities";
 
 export const loginSchema = z.object({
   email: z.string().trim().email("Invalid email format"),
@@ -113,6 +114,7 @@ export const createProjectSchema = z
     name: z.string().trim().min(1, "Project name is required").max(150, "Project name must be at most 150 characters"),
     ownerId: z.number({ error: "Owner is required" }).int().positive("Owner is required"),
     description: z.string().trim().max(5000, "Description must be at most 5000 characters").default(""),
+    priority: z.enum(PROJECT_PRIORITIES, { error: "Priority must be Low, Medium, or High" }).default(DEFAULT_PRIORITY),
     goLiveDate: z
       .string()
       .default("")

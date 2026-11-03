@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -10,12 +11,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchSelect } from "@/components/ui/search-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProjectGantt, type TimelinePhase } from "@/features/projects/components/project-gantt";
+import { DEFAULT_PRIORITY, PROJECT_PRIORITIES, type ProjectPriority } from "@/features/projects/data/priorities";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { appToast } from "@/lib/app-toast";
 import { DAY_MS, parseDateOnly, toDateOnly } from "@/lib/date";
-import type { Category, Paged, User } from "@/types";
+import type { Category, Paged, ProjectDetail, User } from "@/types";
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });
@@ -50,23 +53,39 @@ function orderError(phase: TimelinePhase): string | null {
   return start !== null && end !== null && end < start ? "End date must be on or after the start date." : null;
 }
 
-export function CreateProjectPage() {
-  const [name, setName] = useState("");
-  const [ownerId, setOwnerId] = useState<string | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
-  const [repositories, setRepositories] = useState([{ id: "repo-0", value: "" }]);
-  const [goLiveDate, setGoLiveDate] = useState("");
-  const [description, setDescription] = useState("");
-  const [urls, setUrls] = useState<Record<string, string>>({});
+function ProjectForm({ project }: { project?: ProjectDetail }) {
+  const router = useRouter();
+  const isEdit = project !== undefined;
+  const [name, setName] = useState(project?.Name ?? "");
+  const [ownerId, setOwnerId] = useState<string | null>(project ? String(project.OwnerId) : null);
+  const [tags, setTags] = useState<string[]>(project?.Tags.map((tag) => tag.Name) ?? []);
+  const [repositories, setRepositories] = useState(() =>
+    project?.Repositories.length
+      ? project.Repositories.map((value, index) => ({ id: `repo-${index}`, value }))
+      : [{ id: "repo-0", value: "" }]
+  );
+  const [goLiveDate, setGoLiveDate] = useState(project?.GoLiveDate ?? "");
+  const [description, setDescription] = useState(project?.Description ?? "");
+  const [priority, setPriority] = useState<ProjectPriority>(
+    PROJECT_PRIORITIES.find((item) => item === project?.Priority) ?? DEFAULT_PRIORITY
+  );
+  const [urls, setUrls] = useState<Record<string, string>>(() =>
+    Object.fromEntries((project?.Environments ?? []).map((item) => [item.Environment, item.Url]))
+  );
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // Nama project yang ditolak server karena sudah dipakai; dipakai untuk pesan di bawah field nama.
   const [takenName, setTakenName] = useState<string | null>(null);
-  // Dinaikkan setelah form dikosongkan, supaya dropdown owner ikut kosong.
-  const [formKey, setFormKey] = useState(0);
-  const [phases, setPhases] = useState<TimelinePhase[]>([]);
-  const nextPhaseId = useRef(1);
-  const nextRepositoryId = useRef(1);
+  const [phases, setPhases] = useState<TimelinePhase[]>(() =>
+    (project?.Phases ?? []).map((phase, index) => ({
+      id: `phase-${index}`,
+      name: phase.Name,
+      start: phase.StartDate,
+      end: phase.EndDate,
+    }))
+  );
+  const nextPhaseId = useRef(project?.Phases.length ?? 0);
+  const nextRepositoryId = useRef(Math.max(1, project?.Repositories.length ?? 1));
 
   // null = masih dimuat
   const [users, setUsers] = useState<User[] | null>(null);
@@ -82,29 +101,41 @@ export function CreateProjectPage() {
       });
 
     getJson<Category[]>("/api/categories?category=teams-domain")
-      .then((items) => setTagOptions(items.filter((item) => item.IsActive)))
+      .then((items) => {
+        // Tag yang sudah dipakai project tetap tampil walau nilainya sudah dinonaktifkan, supaya tidak hilang diam-diam saat disimpan.
+        const used = new Set((project?.Tags ?? []).map((tag) => tag.Id));
+        setTagOptions(items.filter((item) => item.IsActive || used.has(item.Id)));
+      })
       .catch(() => {
         setTagOptions([]);
         appToast.error({ title: "Failed to load tags", description: "Something went wrong, please try again." });
       });
 
     getJson<string[]>("/api/env/environments")
-      .then(setEnvironments)
+      .then((names) => {
+        const known = new Set(names.map((item) => item.toLowerCase()));
+        const extra = (project?.Environments ?? []).map((item) => item.Environment).filter((item) => !known.has(item.toLowerCase()));
+        setEnvironments([...names, ...extra]);
+      })
       .catch(() => {
         setEnvironments([]);
         appToast.error({ title: "Failed to load environments", description: "Something went wrong, please try again." });
       });
-  }, []);
+  }, [project]);
 
-  const ownerOptions = useMemo(
-    () =>
-      (users ?? []).map((user) => ({
-        value: String(user.Id),
-        label: user.Name,
-        description: user.RoleName ? `${user.Email} · ${user.RoleName}` : user.Email,
-      })),
-    [users]
-  );
+  const ownerOptions = useMemo(() => {
+    const options = (users ?? []).map((user) => ({
+      value: String(user.Id),
+      label: user.Name,
+      description: user.RoleName ? `${user.Email} · ${user.RoleName}` : user.Email,
+    }));
+
+    // Owner saat ini tetap bisa dipilih walau akunnya sudah tidak aktif.
+    if (project && users && !options.some((option) => option.value === String(project.OwnerId))) {
+      options.push({ value: String(project.OwnerId), label: project.OwnerName, description: "Inactive user" });
+    }
+    return options;
+  }, [project, users]);
 
   const nameError = submitted && !name.trim();
   const nameTaken = takenName !== null && name.trim().toLowerCase() === takenName.toLowerCase();
@@ -158,20 +189,6 @@ export function CreateProjectPage() {
     setTags((current) => (checked ? [...current, tagName] : current.filter((item) => item !== tagName)));
   }
 
-  function resetForm() {
-    setName("");
-    setOwnerId(null);
-    setTags([]);
-    setRepositories([{ id: `repo-${nextRepositoryId.current++}`, value: "" }]);
-    setGoLiveDate("");
-    setDescription("");
-    setUrls({});
-    setPhases([]);
-    setSubmitted(false);
-    setTakenName(null);
-    setFormKey((current) => current + 1);
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitted(true);
@@ -183,13 +200,14 @@ export function CreateProjectPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/projects", {
-        method: "POST",
+      const res = await fetch(isEdit ? `/api/projects/${project.NewId}` : "/api/projects", {
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
           ownerId: Number(ownerId),
           description: description.trim(),
+          priority,
           goLiveDate,
           tags: (tagOptions ?? []).filter((tag) => tags.includes(tag.Name)).map((tag) => tag.Id),
           repositories: repositories.map((item) => item.value.trim()).filter(Boolean),
@@ -205,14 +223,14 @@ export function CreateProjectPage() {
 
       if (!res.ok) {
         if (res.status === 409) setTakenName(name.trim());
-        appToast.error({ title: "Failed to create project", description: data?.error ?? "Something went wrong, please try again." });
+        appToast.error({ title: isEdit ? "Failed to update project" : "Failed to create project", description: data?.error ?? "Something went wrong, please try again." });
         return;
       }
 
-      appToast.success({ title: "Project created", description: `${data.Name} was saved.` });
-      resetForm();
+      appToast.success({ title: isEdit ? "Project updated" : "Project created", description: `${data.Name} was saved.` });
+      router.push(isEdit ? `/projects/${project.NewId}` : "/projects");
     } catch {
-      appToast.error({ title: "Failed to create project", description: "Unable to reach the server, please try again." });
+      appToast.error({ title: isEdit ? "Failed to update project" : "Failed to create project", description: "Unable to reach the server, please try again." });
     } finally {
       setSubmitting(false);
     }
@@ -221,17 +239,24 @@ export function CreateProjectPage() {
   return (
     <AppShell
       activeNav="projects"
-      breadcrumbs={[
-        { label: "Projects", href: "/projects" },
-        { label: "Create Project" },
-      ]}
+      breadcrumbs={
+        isEdit
+          ? [
+              { label: "Projects", href: "/projects" },
+              { label: project.Name, href: `/projects/${project.NewId}` },
+              { label: "Edit" },
+            ]
+          : [{ label: "Projects", href: "/projects" }, { label: "Create Project" }]
+      }
       eyebrow="Project routing"
-      title="Create Project"
+      title={isEdit ? "Edit Project" : "Create Project"}
       toolbar={
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">New project setup</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{isEdit ? "Edit project" : "New project setup"}</h2>
           <p className="text-sm text-muted-foreground">
-            Add a new project with its owner, tags, environment URLs, and go-live date.
+            {isEdit
+              ? "Update the owner, tags, timeline, repositories, and environment URLs of this project."
+              : "Add a new project with its owner, tags, environment URLs, and go-live date."}
           </p>
         </div>
       }
@@ -241,7 +266,7 @@ export function CreateProjectPage() {
           <CardHeader>
             <CardTitle>Project details</CardTitle>
             <CardDescription>
-              Every new project uses a GUID-style ID when it is later saved to the data source or backend.
+              {isEdit ? `Project ID: ${project.NewId}` : "Every new project gets a GUID-style ID when it is saved."}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-6">
@@ -261,7 +286,6 @@ export function CreateProjectPage() {
               <div className="grid gap-2">
                 <Label htmlFor="project-owner">Owner</Label>
                 <SearchSelect
-                  key={formKey}
                   id="project-owner"
                   options={ownerOptions}
                   value={ownerId}
@@ -308,17 +332,34 @@ export function CreateProjectPage() {
                   </p>
                 )}
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="project-go-live">Go Live date</Label>
-                <Input
-                  id="project-go-live"
-                  type="date"
-                  className="[color-scheme:light] dark:[color-scheme:dark]"
-                  min={DATE_MIN}
-                  max={DATE_MAX}
-                  value={goLiveDate}
-                  onChange={(event) => setGoLiveDate(event.target.value)}
-                />
+              <div className="grid gap-6">
+                <div className="grid gap-2">
+                  <Label htmlFor="project-go-live">Go Live date</Label>
+                  <Input
+                    id="project-go-live"
+                    type="date"
+                    className="[color-scheme:light] dark:[color-scheme:dark]"
+                    min={DATE_MIN}
+                    max={DATE_MAX}
+                    value={goLiveDate}
+                    onChange={(event) => setGoLiveDate(event.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="project-priority">Priority</Label>
+                  <Select value={priority} onValueChange={(value) => setPriority((value ?? DEFAULT_PRIORITY) as ProjectPriority)}>
+                    <SelectTrigger id="project-priority" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROJECT_PRIORITIES.map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
@@ -509,14 +550,83 @@ export function CreateProjectPage() {
         </Card>
 
         <div className="flex items-center justify-between gap-3">
-          <Button nativeButton={false} render={<Link href="/projects" />} variant="outline">
+          <Button nativeButton={false} render={<Link href={isEdit ? `/projects/${project.NewId}` : "/projects"} />} variant="outline">
             Cancel
           </Button>
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Creating..." : "Create project"}
+            {submitting ? (isEdit ? "Saving..." : "Creating...") : isEdit ? "Save changes" : "Create project"}
           </Button>
         </div>
       </form>
     </AppShell>
   );
+}
+
+type LoadState =
+  | { status: "loading" }
+  | { status: "notFound" }
+  | { status: "error" }
+  | { status: "ready"; project: ProjectDetail };
+
+function EditProjectLoader({ id }: { id: string }) {
+  const [state, setState] = useState<LoadState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`/api/projects/${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then(async (res) => {
+        if (res.status === 404) return { status: "notFound" } as const;
+        if (!res.ok) return { status: "error" } as const;
+        return { status: "ready", project: (await res.json()) as ProjectDetail } as const;
+      })
+      .catch(() => ({ status: "error" }) as const)
+      .then((next) => {
+        if (!cancelled) setState(next);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // Form baru dibuat setelah data project ada, jadi isian awalnya langsung terisi.
+  if (state.status === "ready") return <ProjectForm project={state.project} />;
+
+  return (
+    <AppShell
+      activeNav="projects"
+      breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: "Edit Project" }]}
+      eyebrow="Project routing"
+      title="Edit Project"
+    >
+      {state.status === "loading" ? (
+        <div className="space-y-6" aria-hidden="true">
+          <Skeleton className="h-72 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>{state.status === "notFound" ? "Project not found" : "Failed to load project"}</CardTitle>
+            <CardDescription>
+              {state.status === "notFound"
+                ? `There is no project with id ${id}.`
+                : "Something went wrong while loading this project, please try again."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button nativeButton={false} render={<Link href="/projects" />} variant="outline">
+              <ArrowLeft /> Back to projects
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </AppShell>
+  );
+}
+
+// Tanpa projectId: form membuat project baru. Dengan projectId: form mengedit project itu.
+export function ProjectFormPage({ projectId }: { projectId?: string }) {
+  return projectId ? <EditProjectLoader id={projectId} /> : <ProjectForm />;
 }

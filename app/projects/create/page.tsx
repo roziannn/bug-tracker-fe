@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { CreateProjectPage } from "@/features/projects/components/create-project-page";
+import { ProjectFormPage } from "@/features/projects/components/project-form-page";
 
 export const metadata: Metadata = {
   title: "Create Project",
 };
 
 export default function CreateProjectRoute() {
-  return <CreateProjectPage />;
+  return <ProjectFormPage />;
 }

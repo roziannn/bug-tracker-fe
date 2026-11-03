@@ -15,6 +15,8 @@ export const dataProjects = pgTable(
       .references(() => coreUser.Id, { onDelete: "restrict" }),
     Description: text("Description").notNull().default(""),
     GoLiveDate: date("GoLiveDate", { mode: "string" }),
+    // Low, Medium, atau High (lihat features/projects/data/priorities.ts).
+    Priority: varchar("Priority", { length: 10 }).notNull().default("Medium"),
     ...auditColumns,
   },
   (t) => [uniqueIndex("DATA_Projects_Name_key").on(t.Name)]
