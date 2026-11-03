@@ -69,3 +69,11 @@ export interface EnvVar extends AuditFields {
   IsSecret: boolean;
   HasValue: boolean;
 }
+
+export interface Category extends AuditFields {
+  Id: number;
+  CategoryName: string;
+  Name: string;
+  Description: string;
+  IsActive: boolean;
+}

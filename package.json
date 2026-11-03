@@ -15,6 +15,7 @@
     "db:query": "dotenv -e .env -- tsx scripts/db-query.ts",
     "test-db": "dotenv -e .env -- tsx scripts/test-db.ts",
     "seed-access": "dotenv -e .env -- tsx scripts/seed-access.ts",
+    "seed-category": "dotenv -e .env -- tsx scripts/seed-category.ts",
     "seed-menu": "dotenv -e .env -- tsx scripts/seed-menu.ts",
     "seed-user": "dotenv -e .env -- tsx scripts/seed-user.ts"
   },

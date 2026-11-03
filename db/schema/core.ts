@@ -102,3 +102,17 @@ export const coreEnv = pgTable(
   },
   (t) => [uniqueIndex("CORE_Env_Environment_Key_key").on(t.Environment, t.Key)]
 );
+
+// Nilai-nilai kategori (Settings → Categories). CategoryName = nama kategorinya (mis. "Audit Trail Outcome"),
+// Name = salah satu nilainya (mis. "Success"). Satu nilai satu baris.
+export const coreCategory = pgTable(
+  "CORE_Category",
+  {
+    Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+    CategoryName: varchar("CategoryName", { length: 100 }).notNull(),
+    Name: varchar("Name", { length: 100 }).notNull(),
+    Description: varchar("Description", { length: 255 }).notNull().default(""),
+    ...auditColumns,
+  },
+  (t) => [uniqueIndex("CORE_Category_CategoryName_Name_key").on(t.CategoryName, t.Name)]
+);

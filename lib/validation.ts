@@ -86,3 +86,12 @@ export const updateEnvVarSchema = z.object({
 });
 
 export type UpdateEnvVarInput = z.infer<typeof updateEnvVarSchema>;
+
+export const categorySchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name must be at most 100 characters"),
+  description: z.string().trim().max(255, "Description must be at most 255 characters").default(""),
+});
+
+export type CategoryInput = z.infer<typeof categorySchema>;
+
+export const categoryActiveSchema = z.object({ isActive: z.boolean() });
