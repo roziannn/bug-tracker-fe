@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlignLeft, Archive, ArrowDown, ArrowUp, Ban, Check, FolderOpenDot, Link2, MoreHorizontal, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Save, Search, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { moveCard } from "@/features/kanban/data/reorder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -22,23 +24,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDate, formatDateTime as formatDateTimeStamp } from "@/lib/date";
 import { cn } from "@/lib/utils";
+import { requestJson } from "@/lib/request";
+import { appToast } from "@/lib/app-toast";
 import {
-  issues as initialIssues,
   kanbanColumns,
   type KanbanColumn,
-  projectOptions,
   type IssueRecord,
   type IssueStatus,
 } from "@/features/bug-tracker/data/bug-tracker-data";
+import type { Project } from "@/types";
 
-const STORAGE_KEY = "bug-tracker:kanban-issues";
 const COLUMNS_STORAGE_KEY = "bug-tracker:kanban-columns";
 const CURRENT_AUTHOR = "You";
+type PersistedKanbanCard = IssueRecord & { sequence: number };
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -47,7 +51,14 @@ function newId(prefix: string) {
 type DragState = {
   issueId: string | null;
   overColumn: IssueStatus | null;
+  /** Kartu yang akan berada tepat di bawah kartu yang diseret. Null = di paling bawah kolom. */
+  overBeforeId: string | null;
 };
+
+// Garis penanda tempat kartu akan jatuh saat diseret.
+function DropIndicator() {
+  return <div aria-hidden="true" className="h-1 shrink-0 rounded-full bg-primary" />;
+}
 
 function KanbanToolbar({
   showArchived,
@@ -132,7 +143,6 @@ function IssueCard({
                   <Check className="size-2.5" strokeWidth={3.5} />
                 </span>
               ) : null}
-              {issue.id}
               {issue.archived ? <span className="text-xs font-normal text-muted-foreground">Archived</span> : null}
               {issue.inactive ? <span className="text-xs font-normal text-muted-foreground">Inactive</span> : null}
             </CardTitle>
@@ -176,6 +186,7 @@ function KanbanColumnView({
   description,
   issues,
   isOver,
+  overBeforeId,
   draggingId,
   onDragStart,
   onDragEnd,
@@ -189,16 +200,23 @@ function KanbanColumnView({
   description: string;
   issues: IssueRecord[];
   isOver: boolean;
+  overBeforeId: string | null;
   draggingId: string | null;
   onDragStart: (issueId: string) => void;
   onDragEnd: () => void;
-  onDragOver: (column: IssueStatus) => void;
+  onDragOver: (column: IssueStatus, beforeId: string | null) => void;
   onDrop: (column: IssueStatus) => void;
   onOpen: (issueId: string) => void;
   onAddCard: (column: IssueStatus, title: string) => void;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
+
+  // Kalau kartu yang diseret dilepas tepat di bawah dirinya sendiri atau di bawah tetangganya, urutan tidak berubah: garis disembunyikan.
+  const draggedIndex = draggingId ? issues.findIndex((issue) => issue.id === draggingId) : -1;
+  const staysInPlace =
+    draggedIndex >= 0 && (overBeforeId === draggingId || overBeforeId === (issues[draggedIndex + 1]?.id ?? null));
+  const showIndicator = isOver && draggingId !== null && !staysInPlace;
 
   function submitCard() {
     const title = draftTitle.trim();
@@ -216,7 +234,17 @@ function KanbanColumnView({
       )}
       onDragOver={(event) => {
         event.preventDefault();
-        onDragOver(id);
+
+        // Posisi sisip: sebelum kartu pertama yang titik tengahnya ada di bawah kursor. Tidak ada = paling bawah.
+        let beforeId: string | null = null;
+        for (const card of event.currentTarget.querySelectorAll<HTMLElement>("[data-flip-id]")) {
+          const rect = card.getBoundingClientRect();
+          if (event.clientY < rect.top + rect.height / 2) {
+            beforeId = card.dataset.flipId ?? null;
+            break;
+          }
+        }
+        onDragOver(id, beforeId);
       }}
       onDrop={(event) => {
         event.preventDefault();
@@ -234,16 +262,21 @@ function KanbanColumnView({
       </CardHeader>
       <CardContent className="flex flex-1 rounded-lg flex-col gap-3 p-3">
         {issues.length ? (
-          issues.map((issue) => (
-            <IssueCard
-              key={issue.id}
-              dragging={draggingId === issue.id}
-              issue={issue}
-              onDragEnd={onDragEnd}
-              onDragStart={onDragStart}
-              onOpen={onOpen}
-            />
-          ))
+          <>
+            {issues.map((issue) => (
+              <Fragment key={issue.id}>
+                {showIndicator && overBeforeId === issue.id ? <DropIndicator /> : null}
+                <IssueCard
+                  dragging={draggingId === issue.id}
+                  issue={issue}
+                  onDragEnd={onDragEnd}
+                  onDragStart={onDragStart}
+                  onOpen={onOpen}
+                />
+              </Fragment>
+            ))}
+            {showIndicator && overBeforeId === null ? <DropIndicator /> : null}
+          </>
         ) : (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed bg-background/70 px-4 text-center text-sm text-muted-foreground">
             Drop bug cards here.
@@ -585,18 +618,21 @@ function IssueDetailDialog({
   issue,
   onClose,
   onChange,
+  onDelete,
   members,
   allIssues,
+  projects,
 }: {
   issue: IssueRecord | null;
   members: string[];
   allIssues: Pick<IssueRecord, "id" | "title">[];
+  projects: Project[];
   onClose: () => void;
   onChange: (issueId: string, patch: Partial<IssueRecord>) => void;
+  onDelete: (issueId: string) => void;
 }) {
   const [panel, setPanel] = useState<DetailPanel>(null);
   const [memberQuery, setMemberQuery] = useState("");
-  const [issueQuery, setIssueQuery] = useState("");
   const [hideChecked, setHideChecked] = useState<Record<string, boolean>>({});
   const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
   const [addingItemTo, setAddingItemTo] = useState<string | null>(null);
@@ -604,14 +640,17 @@ function IssueDetailDialog({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
   const [commentText, setCommentText] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const checklists = issue?.checklists ?? [];
   const comments = issue?.comments ?? [];
   const linkedIssues = issue?.linkedIssues ?? [];
-  const filteredIssues = allIssues.filter(
-    (item) =>
-      item.id !== issue?.id &&
-      `${item.id} ${item.title}`.toLowerCase().includes(issueQuery.trim().toLowerCase())
-  );
+  const projectSelectOptions: SearchSelectOption[] = [
+    { value: "none", label: "No project" },
+    ...projects.filter((project) => project.IsActive).map((project) => ({ value: project.NewId, label: project.Name, description: project.OwnerName })),
+  ];
+  const issueSelectOptions: SearchSelectOption[] = allIssues
+    .filter((item) => item.id !== issue?.id)
+    .map((item) => ({ value: item.id, label: item.title, description: item.id }));
   const cardMembers = issue?.members ?? (issue && issue.assignee !== "Unassigned" ? [issue.assignee] : []);
   const joined = cardMembers.includes(CURRENT_AUTHOR);
 
@@ -692,7 +731,7 @@ function IssueDetailDialog({
             <div className="space-y-6 p-6 md:h-full md:overflow-y-auto">
               <DialogHeader className="space-y-1">
                 <div className="flex items-center justify-between gap-2 pr-1">
-                  <DialogDescription>{issue.id} · in list</DialogDescription>
+                  <DialogDescription>In {issue.status}</DialogDescription>
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={<Button variant="ghost" size="icon-sm" aria-label="Card actions" />}
@@ -720,6 +759,13 @@ function IssueDetailDialog({
                         <Archive className="size-4" />
                         {issue.archived ? "Send to board" : "Archive"}
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => setDeleteConfirmOpen(true)}
+                      >
+                        <Trash2 className="size-4" />
+                        Delete card
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -737,25 +783,17 @@ function IssueDetailDialog({
                   />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Select
-                    value={issue.project ?? "none"}
-                    onValueChange={(value) =>
-                      onChange(issue.id, { project: !value || value === "none" ? undefined : value })
-                    }
-                  >
-                    <SelectTrigger className="w-56">
-                      <FolderOpenDot />
-                      <SelectValue placeholder="Tag project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No project</SelectItem>
-                      {projectOptions.map((project) => (
-                        <SelectItem key={project.value} value={project.value}>
-                          {project.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <FolderOpenDot className="size-4 shrink-0 text-muted-foreground" />
+                    <SearchSelect
+                      options={projectSelectOptions}
+                      value={issue.project ?? "none"}
+                      onValueChange={(value) => onChange(issue.id, { project: !value || value === "none" ? undefined : value })}
+                      placeholder="Search projects..."
+                      emptyText="No projects found."
+                      className="w-60"
+                    />
+                  </div>
 
                   <div className="relative">
                     <Button variant="outline" onClick={() => setPanel(panel === "issues" ? null : "issues")}>
@@ -776,44 +814,23 @@ function IssueDetailDialog({
                             <X />
                           </Button>
                         </div>
-                        <Input
-                          autoFocus
-                          aria-label="Search issues"
-                          value={issueQuery}
-                          onChange={(event) => setIssueQuery(event.target.value)}
-                          placeholder="Search issues"
+                        <SearchSelect
+                          options={issueSelectOptions.filter((option) => !linkedIssues.includes(option.value))}
+                          value={null}
+                          onValueChange={(value) => {
+                            if (value && !linkedIssues.includes(value)) onChange(issue.id, { linkedIssues: [...linkedIssues, value] });
+                          }}
+                          placeholder="Search issues..."
+                          emptyText="No issues found."
+                          className="w-full"
                         />
-                        <ul className="mt-3 grid max-h-60 gap-1 overflow-y-auto">
-                          {filteredIssues.length ? (
-                            filteredIssues.map((item) => {
-                              const linked = linkedIssues.includes(item.id);
-
-                              return (
-                                <li key={item.id}>
-                                  <button
-                                    type="button"
-                                    className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
-                                    onClick={() =>
-                                      onChange(issue.id, {
-                                        linkedIssues: linked
-                                          ? linkedIssues.filter((id) => id !== item.id)
-                                          : [...linkedIssues, item.id],
-                                      })
-                                    }
-                                  >
-                                    <span className="flex-1">
-                                      <span className="font-medium">{item.id}</span>
-                                      <span className="block text-xs text-muted-foreground">{item.title}</span>
-                                    </span>
-                                    {linked ? <Check className="mt-0.5 size-4 shrink-0" /> : null}
-                                  </button>
-                                </li>
-                              );
-                            })
-                          ) : (
-                            <li className="px-2 py-2 text-sm text-muted-foreground">No issues found.</li>
-                          )}
-                        </ul>
+                        <div className="mt-3 flex max-h-48 flex-col gap-2 overflow-y-auto">
+                          {linkedIssues.map((linkedId) => {
+                            const linkedIssue = allIssues.find((item) => item.id === linkedId);
+                            return <div key={linkedId} className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm"><Link2 className="size-3.5 shrink-0 text-muted-foreground" /><span className="min-w-0 flex-1 truncate">{linkedIssue?.title ?? linkedId}</span><Button type="button" size="icon-xs" variant="ghost" aria-label="Remove linked issue" onClick={() => onChange(issue.id, { linkedIssues: linkedIssues.filter((value) => value !== linkedId) })}><X /></Button></div>;
+                          })}
+                          {!linkedIssues.length ? <p className="py-2 text-center text-xs text-muted-foreground">No linked issues yet.</p> : null}
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -1181,7 +1198,7 @@ function IssueDetailDialog({
                         </span>{" "}
                         added this card to {issue.status}
                       </p>
-                      <p className="text-xs text-muted-foreground">{issue.createdAt}</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(issue.createdAt)}</p>
                     </div>
                   </li>
                 ) : null}
@@ -1190,15 +1207,32 @@ function IssueDetailDialog({
           </div>
         ) : null}
       </DialogContent>
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete card?</DialogTitle>
+            <DialogDescription>
+              “{issue?.title || issue?.id}” will be removed from the active Kanban board.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { if (!issue) return; setDeleteConfirmOpen(false); onDelete(issue.id); }}>Delete card</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
 
 export function KanbanBoard() {
-  const [issues, setIssues] = useState<IssueRecord[]>(initialIssues);
+  const [issues, setIssues] = useState<PersistedKanbanCard[]>([]);
+  const issuesRef = useRef<PersistedKanbanCard[]>([]);
+  const updateTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [dragState, setDragState] = useState<DragState>({
     issueId: null,
     overColumn: null,
+    overBeforeId: null,
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -1211,6 +1245,7 @@ export function KanbanBoard() {
     kanbanColumns.filter((column) => column.id !== "Backlog")
   );
   const [userNames, setUserNames] = useState<string[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
     try {
@@ -1222,22 +1257,10 @@ export function KanbanBoard() {
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const stored = JSON.parse(raw) as (IssueRecord & { checklist?: { id: string; text: string; done: boolean }[] })[];
-        setIssues(
-          stored.map(({ checklist, ...issue }) =>
-            checklist?.length && !issue.checklists?.length
-              ? { ...issue, checklists: [{ id: newId("list"), title: "Checklist", items: checklist }] }
-              : issue
-          )
-        );
-      }
-    } catch {
-      // ignore unreadable storage and keep seed data
-    }
-    setHydrated(true);
+    requestJson<PersistedKanbanCard[]>("/api/kanban")
+      .then((cards) => { issuesRef.current = cards; setIssues(cards); })
+      .catch((err) => appToast.error({ title: "Failed to load Kanban cards", description: err instanceof Error ? err.message : undefined }))
+      .finally(() => setHydrated(true));
   }, []);
 
   useEffect(() => {
@@ -1245,6 +1268,9 @@ export function KanbanBoard() {
       .then((res) => (res.ok ? res.json() : null))
       .then((body: { data?: { Name: string }[] } | null) => setUserNames((body?.data ?? []).map((user) => user.Name)))
       .catch(() => setUserNames([]));
+    requestJson<Project[]>("/api/projects")
+      .then((items) => setProjects(items))
+      .catch(() => setProjects([]));
   }, []);
 
   const members = useMemo(
@@ -1257,15 +1283,6 @@ export function KanbanBoard() {
     ],
     [issues, userNames]
   );
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(issues));
-    } catch {
-      // storage unavailable; changes stay in memory only
-    }
-  }, [hydrated, issues]);
 
   const groupedIssues = useMemo(
     () =>
@@ -1291,9 +1308,10 @@ export function KanbanBoard() {
 
     // Cards of a deleted list move to the first remaining list instead of disappearing.
     const keptIds = new Set(cleaned.map((column) => column.id));
-    setIssues((current) =>
-      current.map((issue) => (keptIds.has(issue.status) ? issue : { ...issue, status: cleaned[0].id }))
-    );
+    const updated = issuesRef.current.map((issue) => (keptIds.has(issue.status) ? issue : { ...issue, status: cleaned[0].id }));
+    issuesRef.current = updated;
+    setIssues(updated);
+    persistOrder(updated);
     updateColumns(cleaned);
     setIsListGroupOpen(false);
   }
@@ -1336,35 +1354,72 @@ export function KanbanBoard() {
     });
   }, [issues]);
 
-  function moveIssue(issueId: string, nextStatus: IssueStatus) {
+  // Memindahkan kartu ke kolom `nextStatus`, tepat di atas kartu `beforeId`. Tanpa beforeId, kartu masuk di paling bawah kolom.
+  function moveIssue(issueId: string, nextStatus: IssueStatus, beforeId: string | null = null) {
     captureRects();
-    setIssues((current) =>
-      current.map((issue) =>
-        issue.id === issueId ? { ...issue, status: nextStatus } : issue
-      )
-    );
+    const updated = moveCard(issuesRef.current, issueId, nextStatus, beforeId) as PersistedKanbanCard[];
+    issuesRef.current = updated;
+    setIssues(updated);
+    persistOrder(updated);
   }
 
   function updateIssue(issueId: string, patch: Partial<IssueRecord>) {
-    setIssues((current) => current.map((issue) => (issue.id === issueId ? { ...issue, ...patch } : issue)));
+    const updated = issuesRef.current.map((issue) => (issue.id === issueId ? { ...issue, ...patch } : issue));
+    issuesRef.current = updated;
+    setIssues(updated);
+    const card = updated.find((issue) => issue.id === issueId);
+    if (!card) return;
+    const oldTimer = updateTimers.current.get(issueId);
+    if (oldTimer) clearTimeout(oldTimer);
+    updateTimers.current.set(issueId, setTimeout(() => {
+      const latest = issuesRef.current.find((item) => item.id === issueId);
+      if (latest) requestJson(`/api/kanban/${encodeURIComponent(issueId)}`, "PATCH", latest)
+        .catch((err) => appToast.error({ title: "Failed to save Kanban card", description: err instanceof Error ? err.message : undefined }));
+      updateTimers.current.delete(issueId);
+    }, 350));
   }
 
-  function addCard(status: IssueStatus, title: string) {
-    setIssues((current) => [
-      ...current,
-      {
-        id: `KB-${Date.now().toString(36).toUpperCase()}`,
-        title,
-        priority: "Medium",
-        status,
-        team: "General",
-        assignee: "Unassigned",
-        label: "None",
-        createdAt: new Date().toISOString().slice(0, 10),
-        checklists: [],
-        comments: [],
-      },
-    ]);
+  async function deleteIssue(issueId: string) {
+    const timer = updateTimers.current.get(issueId);
+    if (timer) clearTimeout(timer);
+    updateTimers.current.delete(issueId);
+    try {
+      await requestJson(`/api/kanban/${encodeURIComponent(issueId)}`, "DELETE");
+      const updated = issuesRef.current.filter((issue) => issue.id !== issueId);
+      issuesRef.current = updated;
+      setIssues(updated);
+      setSelectedId(null);
+      appToast.success({ title: "Kanban card deleted" });
+    } catch (err) {
+      appToast.error({ title: "Failed to delete Kanban card", description: err instanceof Error ? err.message : undefined });
+    }
+  }
+
+  async function addCard(status: IssueStatus, title: string) {
+    try {
+      const created = await requestJson<PersistedKanbanCard>("/api/kanban", "POST", {
+        title, status, priority: "Medium", team: "General", assignee: "Unassigned", label: "None",
+        createdAt: new Date().toISOString().slice(0, 10), checklists: [], comments: [],
+      });
+      const updated = [...issuesRef.current, created];
+      issuesRef.current = updated;
+      setIssues(updated);
+    } catch (err) {
+      appToast.error({ title: "Failed to create Kanban card", description: err instanceof Error ? err.message : undefined });
+    }
+  }
+
+  function persistOrder(cards: PersistedKanbanCard[]) {
+    const sequence = new Map<string, number>();
+    const updated = cards.map((card) => {
+      const position = sequence.get(card.status) ?? 0;
+      sequence.set(card.status, position + 1);
+      return { ...card, sequence: position };
+    });
+    issuesRef.current = updated;
+    setIssues(updated);
+    requestJson("/api/kanban/reorder", "PUT", { cards: updated.map(({ id, status, sequence: position }) => ({ id, status, sequence: position })) })
+      .catch((err) => appToast.error({ title: "Failed to save Kanban order", description: err instanceof Error ? err.message : undefined }));
   }
 
   return (
@@ -1477,7 +1532,7 @@ export function KanbanBoard() {
       </Dialog>
       <Card>
         <CardContent className="overflow-x-auto">
-          <div ref={boardRef} className="grid min-w-[58rem] gap-4 xl:grid-cols-4">
+          {!hydrated ? <div className="min-w-[58rem] py-16 text-center text-sm text-muted-foreground">Loading Kanban cards...</div> : <div ref={boardRef} className="grid min-w-[58rem] gap-4 xl:grid-cols-4">
             {groupedIssues.map((column) => (
               <KanbanColumnView
                 key={column.id}
@@ -1485,22 +1540,30 @@ export function KanbanBoard() {
                 draggingId={dragState.issueId}
                 id={column.id}
                 isOver={dragState.overColumn === column.id}
+                overBeforeId={dragState.overBeforeId}
                 issues={column.issues}
-                onDragEnd={() => setDragState({ issueId: null, overColumn: null })}
-                onDragOver={(nextColumn) =>
-                  setDragState((current) => ({ ...current, overColumn: nextColumn }))
+                onDragEnd={() => setDragState({ issueId: null, overColumn: null, overBeforeId: null })}
+                onDragOver={(nextColumn, beforeId) =>
+                  // Dragover menyala terus selama kursor bergerak: state hanya diganti kalau posisinya benar-benar berubah.
+                  setDragState((current) =>
+                    current.overColumn === nextColumn && current.overBeforeId === beforeId
+                      ? current
+                      : { ...current, overColumn: nextColumn, overBeforeId: beforeId }
+                  )
                 }
-                onDragStart={(issueId) => setDragState({ issueId, overColumn: null })}
+                onDragStart={(issueId) => setDragState({ issueId, overColumn: null, overBeforeId: null })}
                 onDrop={(nextColumn) => {
-                  if (dragState.issueId) moveIssue(dragState.issueId, nextColumn);
-                  setDragState({ issueId: null, overColumn: null });
+                  if (dragState.issueId) {
+                    moveIssue(dragState.issueId, nextColumn, dragState.overColumn === nextColumn ? dragState.overBeforeId : null);
+                  }
+                  setDragState({ issueId: null, overColumn: null, overBeforeId: null });
                 }}
                 onOpen={setSelectedId}
                 onAddCard={addCard}
                 title={column.title}
               />
             ))}
-          </div>
+          </div>}
         </CardContent>
       </Card>
 
@@ -1508,8 +1571,10 @@ export function KanbanBoard() {
         issue={issues.find((issue) => issue.id === selectedId) ?? null}
         members={members}
         allIssues={issues.map(({ id, title }) => ({ id, title }))}
+        projects={projects}
         onClose={() => setSelectedId(null)}
         onChange={updateIssue}
+        onDelete={deleteIssue}
       />
     </AppShell>
   );

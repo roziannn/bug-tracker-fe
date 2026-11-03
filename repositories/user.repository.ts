@@ -47,7 +47,7 @@ export async function getUserForAuth(email: string) {
      LEFT JOIN LATERAL (
        SELECT "RoleId" FROM "CORE_RoleClaim" WHERE "Email" = u."Email" ORDER BY "Id" LIMIT 1
      ) rc ON true
-     WHERE lower(u."Email") = lower($1)`,
+     WHERE lower(u."Email") = lower($1) OR lower(u."Name") = lower($1)`,
     [email]
   );
   return rows[0] ?? null;

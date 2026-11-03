@@ -12,11 +12,17 @@ async function main() {
       continue;
     }
 
+    const parentRows = menu.parentId ? await query<{ Id: number }>(`SELECT "Id" FROM "CORE_Menu" WHERE "Code" = $1`, [menu.parentId]) : [];
+    if (menu.parentId && !parentRows[0]) {
+      console.log(`Skip ${menu.id}, parent ${menu.parentId} belum ada`);
+      continue;
+    }
+
     const rows = await query<{ Id: number }>(
-      `INSERT INTO "CORE_Menu" ("Code", "Name", "Path", "Icon", "Sequence", "IsVisible", "CreatedBy", "CreatedDate")
-       VALUES ($1, $2, $3, $4, $5, $6, 'System', now())
+      `INSERT INTO "CORE_Menu" ("Code", "Name", "Path", "Icon", "ParentId", "Sequence", "IsVisible", "CreatedBy", "CreatedDate")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'System', now())
        RETURNING "Id"`,
-      [menu.id, menu.label, menu.path, menu.icon, index + 1, menu.visible]
+      [menu.id, menu.label, menu.path, menu.icon, parentRows[0]?.Id ?? null, index + 1, menu.visible]
     );
 
     for (const action of menu.actions) {

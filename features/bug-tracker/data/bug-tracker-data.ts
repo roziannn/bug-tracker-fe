@@ -4,6 +4,7 @@ export type IssueStatus = "Backlog" | "Ready" | "Investigating" | "In review" | 
 
 export type IssueRecord = {
   id: string;
+  detailId?: string;
   title: string;
   priority: Priority;
   status: IssueStatus;

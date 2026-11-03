@@ -64,6 +64,41 @@
       "when": 1793680716237,
       "tag": "0008_pale_impossible_man",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793690000000,
+      "tag": "0009_create_issues",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793691000000,
+      "tag": "0010_issue_discussion_solution",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793692000000,
+      "tag": "0011_issue_activity",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793693000000,
+      "tag": "0012_issue_comment_replies",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793694000000,
+      "tag": "0013_create_kanban",
+      "breakpoints": true
     }
   ]
 }

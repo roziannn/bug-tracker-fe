@@ -1,5 +1,5 @@
 // Tabel transaksi / flow: prefix DATA_
-import { date, integer, pgTable, text, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { date, integer, jsonb, pgTable, text, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { auditColumns } from "./_columns";
 import { coreCategory, coreUser } from "./core";
 
@@ -75,3 +75,46 @@ export const dataProjectEnvironments = pgTable(
   },
   (t) => [uniqueIndex("DATA_ProjectEnvironments_ProjectId_Environment_key").on(t.ProjectId, t.Environment)]
 );
+
+export const dataIssues = pgTable("DATA_Issues", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  NewId: uuid("NewId").notNull().defaultRandom().unique(),
+  Title: varchar("Title", { length: 255 }).notNull().default(""),
+  Description: text("Description").notNull().default(""),
+  Solution: text("Solution").notNull().default(""),
+  Status: varchar("Status", { length: 30 }).notNull().default("Draft"),
+  ClassificationId: integer("ClassificationId").references(() => coreCategory.Id, { onDelete: "set null" }),
+  Criticality: varchar("Criticality", { length: 50 }).notNull().default("Tier 2 - Major"),
+  PICId: integer("PICId").references(() => coreUser.Id, { onDelete: "set null" }),
+  ProjectId: integer("ProjectId").references(() => dataProjects.Id, { onDelete: "set null" }),
+  Evidence: jsonb("Evidence").$type<{ name: string; size: number }[]>().notNull().default([]),
+  ...auditColumns,
+});
+
+export const dataIssueComments = pgTable("DATA_IssueComments", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  IssueId: integer("IssueId").notNull().references(() => dataIssues.Id, { onDelete: "cascade" }),
+  ParentCommentId: integer("ParentCommentId"),
+  Author: varchar("Author", { length: 150 }).notNull(),
+  Body: text("Body").notNull(),
+  ...auditColumns,
+});
+
+export const dataIssueActivity = pgTable("DATA_IssueActivity", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  IssueId: integer("IssueId").notNull().references(() => dataIssues.Id, { onDelete: "cascade" }),
+  Actor: varchar("Actor", { length: 150 }).notNull(),
+  Action: varchar("Action", { length: 100 }).notNull(),
+  Detail: text("Detail").notNull().default(""),
+  ...auditColumns,
+});
+
+export const dataKanban = pgTable("DATA_Kanban", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  NewId: uuid("NewId").notNull().defaultRandom().unique(),
+  Title: varchar("Title", { length: 255 }).notNull(),
+  Status: varchar("Status", { length: 100 }).notNull(),
+  Sequence: integer("Sequence").notNull().default(0),
+  Payload: jsonb("Payload").$type<Record<string, unknown>>().notNull().default({}),
+  ...auditColumns,
+});

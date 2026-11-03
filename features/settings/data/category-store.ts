@@ -32,6 +32,12 @@ export const categoryConfigs: CategoryConfig[] = [
     ],
   },
   {
+    slug: "issue-classification",
+    title: "Issue Classification",
+    description: "Types of issue that can be selected during issue intake.",
+    defaults: [item("UI Bug"), item("Functional"), item("Performance"), item("Security"), item("Data Integrity"), item("Integration")],
+  },
+  {
     slug: "issue-status",
     title: "Issue Status",
     description: "Statuses an issue can have.",

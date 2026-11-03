@@ -1,8 +1,8 @@
   "use client";
 
   import Link from "next/link";
-  import { useMemo, useState } from "react";
-  import { Download, Eye, ListFilter, Plus, Search, ShieldAlert, TimerReset, TriangleAlert } from "lucide-react";
+  import { useEffect, useMemo, useState } from "react";
+  import { Download, Eye, ListFilter, Pencil, Plus, Search, ShieldAlert, TimerReset, TriangleAlert } from "lucide-react";
 
   import { AppShell } from "@/components/layout/app-shell";
   import { Badge } from "@/components/ui/badge";
@@ -13,52 +13,21 @@
   import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
   import { TablePagination } from "@/components/ui/table-pagination";
   import {
-    issues,
     priorityVariant,
     statusVariant,
     type IssueRecord,
     type IssueStatus,
     type Priority,
   } from "@/features/bug-tracker/data/bug-tracker-data";
+  import { appToast } from "@/lib/app-toast";
   import { formatDate } from "@/lib/date";
+  import { requestJson } from "@/lib/request";
 
   const PAGE_SIZE = 10;
 
   type LabelFilter = string | "None" | "all";
   type StatusFilter = IssueStatus | "all";
   type PriorityFilter = Priority | "all";
-
-  const stats = [
-    {
-      title: "Total open",
-      value: "34",
-      change: "+12.4%",
-      note: "Compared with last week",
-      icon: TimerReset,
-    },
-    {
-      title: "In progress",
-      value: "18",
-      change: "+6.1%",
-      note: "Across active squads",
-      icon: ListFilter,
-    },
-    {
-      title: "Critical blockers",
-      value: "4",
-      change: "+2.0%",
-      note: "Need same-day action",
-      icon: TriangleAlert,
-    },
-    {
-      title: "Closed",
-      value: "29",
-      change: "+18.7%",
-      note: "Resolved this week",
-      icon: ShieldAlert,
-    },
-  ] as const;
-
 
   function exportIssuesToCsv(rows: IssueRecord[]) {
     const headers = ["Ticket ID", "Title", "Status", "Priority", "Label", "Created Date"];
@@ -95,6 +64,7 @@
     onLabelChange,
     onSearchChange,
     onExport,
+    issues,
   }: {
     status: StatusFilter;
     priority: PriorityFilter;
@@ -105,6 +75,7 @@
     onLabelChange: (value: LabelFilter) => void;
     onSearchChange: (value: string) => void;
     onExport: () => void;
+    issues: IssueRecord[];
   }) {
     const labels = Array.from(new Set(issues.map((issue) => issue.label)));
 
@@ -135,6 +106,7 @@
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">all</SelectItem>
+              <SelectItem value="Draft">Draft</SelectItem>
               <SelectItem value="Backlog">Backlog</SelectItem>
               <SelectItem value="Ready">Ready</SelectItem>
               <SelectItem value="Investigating">Investigating</SelectItem>
@@ -183,16 +155,48 @@
   }
 
   export function AllIssuesPage() {
+    const [issues, setIssues] = useState<IssueRecord[] | null>(null);
     const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
     const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
     const [labelFilter, setLabelFilter] = useState<LabelFilter>("all");
     const [searchQuery, setSearchQuery] = useState("");
     const [page, setPage] = useState(1);
 
+    useEffect(() => {
+      requestJson<{
+        id: string; newId: string; title: string; status: string; criticality: string; classification: string | null;
+        pic: string | null; project: string | null; description: string; createdAt: string;
+      }[]>("/api/issues")
+        .then((rows) => setIssues(rows.map((row) => ({
+          id: row.id,
+          detailId: row.newId,
+          title: row.title,
+          status: row.status,
+          priority: row.criticality === "Tier 1 - Critical" ? "Critical" : row.criticality === "Tier 2 - Major" ? "High" : row.criticality === "Tier 3 - Moderate" ? "Medium" : "Low",
+          team: row.project ?? "—",
+          assignee: row.pic ?? "—",
+          label: row.classification ?? "None",
+          createdAt: row.createdAt,
+          summary: row.description,
+        }))))
+        .catch((err) => {
+          setIssues([]);
+          appToast.error({ title: "Failed to load issues", description: err instanceof Error ? err.message : undefined });
+        });
+    }, []);
+
+    const issueRows = issues ?? [];
+    const stats = [
+      { title: "Total open", value: issueRows.filter((issue) => issue.status !== "Done" && issue.status !== "Draft").length, change: "Live", note: "Submitted issues", icon: TimerReset },
+      { title: "In progress", value: issueRows.filter((issue) => ["Investigating", "In review"].includes(issue.status)).length, change: "Live", note: "Investigating or in review", icon: ListFilter },
+      { title: "Critical blockers", value: issueRows.filter((issue) => issue.priority === "Critical" && issue.status !== "Done" && issue.status !== "Draft").length, change: "Live", note: "Open critical issues", icon: TriangleAlert },
+      { title: "Closed", value: issueRows.filter((issue) => issue.status === "Done").length, change: "Live", note: "Completed issues", icon: ShieldAlert },
+    ];
+
     const filteredIssues = useMemo(() => {
       const normalizedQuery = searchQuery.trim().toLowerCase();
 
-      return issues.filter((issue) => {
+      return issueRows.filter((issue) => {
         const statusMatch = statusFilter === "all" || issue.status === statusFilter;
         const priorityMatch = priorityFilter === "all" || issue.priority === priorityFilter;
         const labelMatch =
@@ -209,7 +213,7 @@
 
         return statusMatch && priorityMatch && labelMatch && searchMatch;
       });
-    }, [labelFilter, priorityFilter, searchQuery, statusFilter]);
+    }, [issueRows, labelFilter, priorityFilter, searchQuery, statusFilter]);
 
     const totalPages = Math.max(1, Math.ceil(filteredIssues.length / PAGE_SIZE));
     const currentPage = Math.min(page, totalPages);
@@ -308,6 +312,7 @@
                 priority={priorityFilter}
                 searchQuery={searchQuery}
                 status={statusFilter}
+                issues={issueRows}
               />
             </CardHeader>
             <CardContent className="space-y-4">
@@ -317,7 +322,7 @@
                     <TableHead className="w-[10%]">Ticket ID</TableHead>
                     <TableHead className="w-[28%]">Title</TableHead>
                     <TableHead className="w-[10%]">Label</TableHead>
-                    <TableHead className="w-[10%]">Team</TableHead>
+                    <TableHead className="w-[10%]">Project</TableHead>
                     <TableHead className="w-[12%]">Status</TableHead>
                     <TableHead className="w-[10%]">Priority</TableHead>
                     <TableHead className="w-[12%]">Created date</TableHead>
@@ -325,7 +330,9 @@
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedIssues.length ? (
+                  {issues === null ? (
+                    <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">Loading issues...</TableCell></TableRow>
+                  ) : paginatedIssues.length ? (
                     paginatedIssues.map((issue) => (
                       <TableRow key={issue.id}>
                         <TableCell className="font-medium whitespace-normal break-words">{issue.id}</TableCell>
@@ -348,15 +355,10 @@
                           {formatDate(issue.createdAt)}
                         </TableCell>
                         <TableCell className="whitespace-normal">
-                          <Button
-                            nativeButton={false}
-                            render={<Link href={`/issues/${issue.id}`} />}
-                            size="sm"
-                            variant="outline"
-                          >
-                            <Eye />
-                            Show
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button nativeButton={false} render={<Link href={`/issues/${issue.detailId ?? issue.id}`} />} size="sm" variant="outline"><Eye />Show</Button>
+                            <Button nativeButton={false} render={<Link href={`/issues/${issue.detailId ?? issue.id}/edit`} />} size="icon-sm" variant="outline" aria-label={`Edit ${issue.id}`}><Pencil /></Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

@@ -48,11 +48,13 @@ const rootMenus = [
       { id: "settings.manage-environment", label: "Manage environment" },
     ],
   },
+  { id: "settings-categories", path: "/settings/category", icon: "FolderOpenDot", label: "Categories", parentId: "settings", actions: [] },
+  { id: "settings-issue-classification", path: "/settings/category/issue-classification", icon: "CircleDot", label: "Issue Classification", parentId: "settings-categories", actions: [] },
 ] as const;
 
 export const defaultMenus: MenuNode[] = rootMenus.map((menu) => ({
   ...menu,
-  parentId: null,
+  parentId: "parentId" in menu ? menu.parentId : null,
   visible: true,
   actions: [...menu.actions],
 }));
