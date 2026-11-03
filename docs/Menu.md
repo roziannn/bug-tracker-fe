@@ -101,9 +101,9 @@ Aman dijalankan berulang. Menu yang `Code`-nya sudah ada dilewati.
 
 ## Hubungan dengan Role
 
-Halaman [Role](Role.md) dan **Configure access** membaca daftar menu dan button dari `/api/menus`. Akses per role masih disimpan di `localStorage` dengan acuan `Code` menu dan button. Karena itu `Code` sengaja tidak berubah saat nama diganti.
+Halaman [Role](Role.md) dan **Configure access** membaca daftar menu dan button dari `/api/menus`. Izin per role disimpan di database (`CORE_RoleMenu`, `CORE_RoleMenuAction`) dan dipakai untuk membangun sidebar, lihat [Sidebar](Sidebar.md).
 
-Kalau menu atau button dihapus, akses lama yang menunjuk ke `Code` itu diabaikan dan tidak dihitung.
+Kalau menu atau button dihapus, izin yang menunjuk ke sana ikut terhapus (cascade).
 
 ## Letak kode
 
@@ -118,6 +118,6 @@ Kalau menu atau button dihapus, akses lama yang menunjuk ke `Code` itu diabaikan
 | [components/ui/table-skeleton.tsx](../components/ui/table-skeleton.tsx) | skeleton tabel |
 | [scripts/seed-menu.ts](../scripts/seed-menu.ts) | seed menu bawaan |
 
-## Belum dilakukan
+## Sidebar
 
-Sidebar aplikasi belum membaca tabel ini, dan belum menampilkan menu bertingkat. Menu di sidebar masih tetap, jadi mengubah menu di sini belum mengubah tampilan sidebar.
+Sidebar aplikasi dibangun dari tabel ini, difilter berdasarkan role user yang login. Detailnya ada di [Sidebar](Sidebar.md).

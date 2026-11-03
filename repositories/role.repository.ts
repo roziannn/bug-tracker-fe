@@ -14,7 +14,10 @@ export async function getRoles(page: number, pageSize: number, search: string | 
   );
 
   const dataRows = await query<Role>(
-    `SELECT ${COLUMNS} FROM "CORE_Role"
+    `SELECT ${COLUMNS},
+       (SELECT COUNT(*)::int FROM "CORE_RoleMenu" rm WHERE rm."RoleId" = "CORE_Role"."Id") AS "MenuCount",
+       (SELECT COUNT(*)::int FROM "CORE_RoleMenuAction" ra WHERE ra."RoleId" = "CORE_Role"."Id") AS "ActionCount"
+     FROM "CORE_Role"
      WHERE ($1::text IS NULL OR "Name" ILIKE $1)
      ORDER BY "Id"
      OFFSET $2 LIMIT $3`,

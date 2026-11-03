@@ -53,3 +53,8 @@ export type MenuInput = z.infer<typeof menuSchema>;
 export const menuVisibleSchema = z.object({ visible: z.boolean() });
 
 export const menuMoveSchema = z.object({ direction: z.union([z.literal(-1), z.literal(1)]) });
+
+export const roleAccessSchema = z.object({
+  menus: z.array(z.string()).default([]),
+  actions: z.array(z.string()).default([]),
+});

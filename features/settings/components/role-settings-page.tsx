@@ -22,7 +22,6 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import type { MenuNode } from "@/features/settings/data/access-catalog";
 import { fetchMenus } from "@/features/settings/data/menu-store";
-import { loadRoles, saveRoles, type RoleAccess } from "@/features/settings/data/role-access-store";
 import { appToast } from "@/lib/app-toast";
 import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
@@ -37,7 +36,6 @@ export function RoleSettingsPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [total, setTotal] = useState(0);
   const [loadedPage, setLoadedPage] = useState<number | null>(null);
-  const [access, setAccess] = useState<RoleAccess[]>([]);
   const [menus, setMenus] = useState<MenuNode[]>([]);
   const [page, setPage] = useState(1);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -67,7 +65,6 @@ export function RoleSettingsPage() {
   }, [fetchRoles]);
 
   useEffect(() => {
-    setAccess(loadRoles());
     fetchMenus()
       .then(setMenus)
       .catch(() => setMenus([]));
@@ -90,13 +87,6 @@ export function RoleSettingsPage() {
       if (!res.ok) {
         appToast.error({ title: "Failed to save role", description: body.error ?? "Something went wrong, please try again." });
         return;
-      }
-
-      // Akses menu/button masih disimpan per nama role, jadi ikut dipindahkan saat nama berubah.
-      if (draft.id && draft.originalName !== name) {
-        const next = loadRoles().map((item) => (item.name === draft.originalName ? { ...item, name } : item));
-        saveRoles(next);
-        setAccess(next);
       }
 
       appToast.success({ title: draft.id ? "Role updated" : "Role added", description: name });
@@ -147,13 +137,8 @@ export function RoleSettingsPage() {
             <TableBody>
               {showSkeleton ? <TableSkeletonRows rows={PAGE_SIZE} columns={6} /> : null}
               {(showSkeleton ? [] : roles).map((role) => {
-                const roleAccess = access.find((item) => item.name === role.Name);
-                const menuCount = (roleAccess?.menus ?? ["overview"]).filter((id) =>
-                  menus.some((menu) => menu.id === id)
-                ).length;
-                const actionCount = (roleAccess?.actions ?? []).filter((id) =>
-                  menus.some((menu) => menu.actions.some((action) => action.id === id))
-                ).length;
+                const menuCount = role.MenuCount ?? 0;
+                const actionCount = role.ActionCount ?? 0;
 
                 return (
                   <TableRow key={role.Id} className={cn(!role.IsActive && "opacity-60")}>

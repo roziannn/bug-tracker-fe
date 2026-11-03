@@ -55,3 +55,35 @@ export const coreMenuAction = pgTable("CORE_MenuAction", {
   Name: varchar("Name", { length: 100 }).notNull(),
   ...auditColumns,
 });
+
+// Izin role: menu mana yang boleh dilihat (muncul di sidebar).
+export const coreRoleMenu = pgTable(
+  "CORE_RoleMenu",
+  {
+    Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+    RoleId: integer("RoleId")
+      .notNull()
+      .references(() => coreRole.Id, { onDelete: "cascade" }),
+    MenuId: integer("MenuId")
+      .notNull()
+      .references(() => coreMenu.Id, { onDelete: "cascade" }),
+    ...auditColumns,
+  },
+  (t) => [uniqueIndex("CORE_RoleMenu_RoleId_MenuId_key").on(t.RoleId, t.MenuId)]
+);
+
+// Izin role: button / function mana yang boleh dipakai.
+export const coreRoleMenuAction = pgTable(
+  "CORE_RoleMenuAction",
+  {
+    Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+    RoleId: integer("RoleId")
+      .notNull()
+      .references(() => coreRole.Id, { onDelete: "cascade" }),
+    MenuActionId: integer("MenuActionId")
+      .notNull()
+      .references(() => coreMenuAction.Id, { onDelete: "cascade" }),
+    ...auditColumns,
+  },
+  (t) => [uniqueIndex("CORE_RoleMenuAction_RoleId_MenuActionId_key").on(t.RoleId, t.MenuActionId)]
+);

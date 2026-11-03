@@ -4,63 +4,91 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Save } from "lucide-react";
 
+import { useCurrentUser } from "@/components/app/user-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import type { MenuNode } from "@/features/settings/data/access-catalog";
 import { fetchMenus, orderMenus } from "@/features/settings/data/menu-store";
-import { defaultRoles, loadRoles, saveRoles, type RoleAccess } from "@/features/settings/data/role-access-store";
+import { appToast } from "@/lib/app-toast";
+import type { Paged, Role, RoleAccess } from "@/types";
 
 function toggle(list: string[], id: string, enabled: boolean) {
   return enabled ? [...list.filter((item) => item !== id), id] : list.filter((item) => item !== id);
 }
 
 export function RoleAccessPage({ roleName }: { roleName: string }) {
-  const [role, setRole] = useState<RoleAccess | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const { refreshUser } = useCurrentUser();
+  const [role, setRole] = useState<Role | null>(null);
+  const [access, setAccess] = useState<RoleAccess>({ menus: [], actions: [] });
   const [menus, setMenus] = useState<MenuNode[]>([]);
-  const [saved, setSaved] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchMenus()
-      .then(setMenus)
-      .catch(() => setMenus([]));
-
-    // Role berasal dari database; akses menu/button-nya masih disimpan di browser per nama role.
     async function load() {
-      let exists = false;
       try {
-        const res = await fetch(`/api/roles?pageSize=100&search=${encodeURIComponent(roleName)}`, { cache: "no-store" });
-        const body = (await res.json()) as { data?: { Name: string }[] };
-        exists = !!body.data?.some((item) => item.Name === roleName);
-      } catch {
-        exists = false;
-      }
+        const [allMenus, roles] = await Promise.all([
+          fetchMenus(),
+          fetch(`/api/roles?pageSize=100&search=${encodeURIComponent(roleName)}`, { cache: "no-store" }).then(
+            (res) => res.json() as Promise<Paged<Role>>
+          ),
+        ]);
+        setMenus(allMenus);
 
-      const found = loadRoles().find((item) => item.name === roleName) ?? defaultRoles.find((item) => item.name === roleName);
-      setRole(exists ? (found ?? { name: roleName, menus: ["overview"], actions: [] }) : null);
-      setNotFound(!exists);
+        const found = roles.data?.find((item) => item.Name === roleName) ?? null;
+        setRole(found);
+
+        if (found) {
+          const res = await fetch(`/api/roles/${found.Id}/access`, { cache: "no-store" });
+          if (res.ok) setAccess((await res.json()) as RoleAccess);
+        }
+      } catch {
+        appToast.error({ title: "Failed to load access", description: "Something went wrong, please try again." });
+      } finally {
+        setLoaded(true);
+      }
     }
 
     load();
   }, [roleName]);
 
   function setMenu(menuId: string, enabled: boolean) {
-    setSaved(false);
-    setRole((current) => (current ? { ...current, menus: toggle(current.menus, menuId, enabled) } : current));
+    setAccess((current) => ({ ...current, menus: toggle(current.menus, menuId, enabled) }));
   }
 
   function setAction(actionId: string, enabled: boolean) {
-    setSaved(false);
-    setRole((current) => (current ? { ...current, actions: toggle(current.actions, actionId, enabled) } : current));
+    setAccess((current) => ({ ...current, actions: toggle(current.actions, actionId, enabled) }));
   }
 
-  function save() {
-    if (!role) return;
-    const roles = loadRoles();
-    saveRoles(roles.some((item) => item.name === role.name) ? roles.map((item) => (item.name === role.name ? role : item)) : [...roles, role]);
-    setSaved(true);
+  async function save() {
+    if (!role || saving) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/roles/${role.Id}/access`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(access),
+      });
+      const body = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        appToast.error({ title: "Failed to save access", description: body?.error ?? "Something went wrong, please try again." });
+        return;
+      }
+
+      setAccess(body as RoleAccess);
+      appToast.success({ title: "Access saved", description: roleName });
+      // Kalau yang diubah adalah role milik user yang sedang login, sidebar-nya ikut diperbarui.
+      await refreshUser();
+    } catch {
+      appToast.error({ title: "Failed to save access", description: "Something went wrong, please try again." });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -73,7 +101,10 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
         <div className="flex flex-col gap-3">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Access: {roleName}</h2>
-            <p className="text-sm text-muted-foreground">Enable a menu, then choose which buttons this role can use.</p>
+            <p className="text-sm text-muted-foreground">
+              Enable a menu, then choose which buttons this role can use. A sub menu only shows in the sidebar when its
+              parent menu is enabled too.
+            </p>
           </div>
         </div>
       }
@@ -84,22 +115,19 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
             <ArrowLeft />
             Back to roles
           </Button>
-          <div className="flex items-center gap-3">
-            {saved ? <span className="text-sm text-muted-foreground">Saved</span> : null}
-            <Button onClick={save} disabled={!role}>
-              <Save />
-              Save changes
-            </Button>
-          </div>
+          <Button onClick={save} disabled={!role || saving}>
+            <Save />
+            {saving ? "Saving..." : "Save changes"}
+          </Button>
         </div>
 
-        {notFound ? (
+        {loaded && !role ? (
           <Card>
             <CardContent className="py-8 text-sm text-muted-foreground">Role “{roleName}” not found.</CardContent>
           </Card>
         ) : null}
 
-        {role ? (
+        {!loaded || role ? (
           <Card>
             <CardContent>
               <Table>
@@ -113,8 +141,9 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {!loaded ? <TableSkeletonRows rows={7} columns={5} /> : null}
                   {orderMenus(menus).map(({ menu, depth }) => {
-                    const menuEnabled = role.menus.includes(menu.id);
+                    const menuEnabled = access.menus.includes(menu.id);
                     const parent = menus.find((item) => item.id === menu.parentId);
                     const sequence = menus.filter((item) => item.parentId === menu.parentId).indexOf(menu) + 1;
 
@@ -137,7 +166,7 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
                                     type="checkbox"
                                     className="size-4 accent-primary"
                                     disabled={!menuEnabled}
-                                    checked={menuEnabled && role.actions.includes(action.id)}
+                                    checked={menuEnabled && access.actions.includes(action.id)}
                                     onChange={(event) => setAction(action.id, event.target.checked)}
                                   />
                                   {action.label}
@@ -162,6 +191,13 @@ export function RoleAccessPage({ roleName }: { roleName: string }) {
                       </TableRow>
                     );
                   })}
+                  {loaded && menus.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                        No menus yet. Add menus in Settings → Menu first.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
                 </TableBody>
               </Table>
             </CardContent>

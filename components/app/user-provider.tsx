@@ -1,17 +1,15 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-
-type CurrentUser = {
-  name: string;
-  email: string;
-};
+import type { CurrentUser } from "@/types";
 
 type UserContextValue = {
   user: CurrentUser | null;
   isLoading: boolean;
   clearUser: () => void;
   refreshUser: () => Promise<void>;
+  /** True kalau role user punya izin untuk button / function dengan code ini (contoh: "issues.create"). */
+  hasAction: (code: string) => boolean;
 };
 
 const UserContext = createContext<UserContextValue>({
@@ -19,6 +17,7 @@ const UserContext = createContext<UserContextValue>({
   isLoading: true,
   clearUser: () => {},
   refreshUser: async () => {},
+  hasAction: () => false,
 });
 
 export function UserProvider({ children }: { children: ReactNode }) {
@@ -28,7 +27,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const refreshUser = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/me", { cache: "no-store" });
-      setUser(res.ok ? await res.json() : null);
+      setUser(res.ok ? ((await res.json()) as CurrentUser) : null);
     } catch {
       setUser(null);
     } finally {
@@ -44,8 +43,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  function hasAction(code: string) {
+    return !!user?.actions.includes(code);
+  }
+
   return (
-    <UserContext.Provider value={{ user, isLoading, clearUser, refreshUser }}>
+    <UserContext.Provider value={{ user, isLoading, clearUser, refreshUser, hasAction }}>
       {children}
     </UserContext.Provider>
   );

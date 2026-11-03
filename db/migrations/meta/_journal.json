@@ -15,6 +15,13 @@
       "when": 1793324501623,
       "tag": "0001_lonely_kat_farrell",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793351680724,
+      "tag": "0002_calm_mongoose",
+      "breakpoints": true
     }
   ]
 }

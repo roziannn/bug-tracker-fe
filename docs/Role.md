@@ -9,7 +9,7 @@ Fitur untuk mengelola role (tambah dan edit) yang tersimpan di tabel `CORE_Role`
 | Bagian | Disimpan di | Status |
 |--------|-------------|--------|
 | Daftar role (nama, aktif/nonaktif) | Database (`CORE_Role`) | Sudah ke database |
-| Akses menu & button per role | `localStorage` browser | Belum ke database |
+| Akses menu & button per role | Database (`CORE_RoleMenu`, `CORE_RoleMenuAction`) | Sudah ke database, dipakai untuk sidebar. Lihat [Sidebar](Sidebar.md) |
 
 ## Tabel `CORE_Role`
 
@@ -39,7 +39,7 @@ File: [features/settings/components/role-settings-page.tsx](../features/settings
 - **Configure access:** membuka `/settings/role/<nama role>`.
 - **Notifikasi:** toast sukses atau error setelah menyimpan.
 
-Kolom **Menus** dan **Buttons** menunjukkan jumlah akses yang aktif dibanding total, dibaca dari `localStorage`. Role yang belum pernah diatur dihitung punya menu `overview` saja dan 0 button.
+Kolom **Menus** dan **Buttons** menunjukkan jumlah menu dan button yang diizinkan dibanding total, dihitung dari database. Role yang belum pernah diatur menunjukkan 0.
 
 ## API
 
@@ -82,24 +82,40 @@ Nama dicek kembar **tanpa membedakan huruf besar/kecil**: "Admin" dan "admin" di
 | [app/api/roles/[id]/route.ts](../app/api/roles/%5Bid%5D/route.ts) | `GET` satu, `PUT` ubah |
 | [features/settings/components/role-settings-page.tsx](../features/settings/components/role-settings-page.tsx) | halaman daftar, dialog tambah/edit |
 | [features/settings/components/role-access-page.tsx](../features/settings/components/role-access-page.tsx) | halaman Configure access |
-| [features/settings/data/role-access-store.ts](../features/settings/data/role-access-store.ts) | penyimpanan akses di `localStorage` |
+| [repositories/access.repository.ts](../repositories/access.repository.ts) | baca dan simpan izin role |
+| [app/api/roles/[id]/access/route.ts](../app/api/roles/%5Bid%5D/access/route.ts) | API izin role |
 
 ## Configure access
 
-Halaman `/settings/role/<nama role>` mengatur menu mana yang tampil dan button mana yang boleh dipakai role tersebut.
+Halaman `/settings/role/<nama role>` mengatur menu mana yang boleh dilihat dan button mana yang boleh dipakai role tersebut.
 
-- Saat dibuka, halaman mengecek ke `/api/roles` apakah role dengan nama itu ada di database. Kalau tidak ada, muncul "Role tidak ditemukan".
-- Pengaturannya disimpan di `localStorage` dengan key `bug-tracker:role-access`, dikaitkan lewat **nama role**.
-- Saat nama role diubah di halaman Role, entri akses ikut dipindahkan ke nama baru, tapi hanya di browser yang dipakai untuk mengedit.
+- Saat dibuka, halaman mencari role di database dan memuat izinnya. Kalau role tidak ada, muncul "Role ... not found".
+- Centang **Menu Access** untuk mengizinkan sebuah menu. Button (function) di menu itu baru bisa dicentang setelah menunya diizinkan.
+- Tombol **Save changes** menyimpan ke database. Kalau yang diubah adalah role milik user yang sedang login, sidebar-nya langsung ikut berubah.
+- Izin terikat ke **id role**, jadi mengganti nama role tidak memutus izinnya.
 
-### Keterbatasan saat ini
+### API izin
 
-- Akses hanya ada di browser yang mengaturnya. Browser atau komputer lain tidak melihatnya, dan data hilang kalau storage dibersihkan.
-- Role dari database yang belum pernah diatur dimulai dengan menu `overview` saja.
-- Role default lama (Admin, Lead, Engineer, QA) hanya bawaan front-end, **tidak** ada di database. Tambahkan lewat Add Role kalau masih dibutuhkan.
-- Akses belum dipakai untuk membatasi apa pun di aplikasi. Saat ini hanya tampilan pengaturan.
+| Method | URL | Fungsi |
+|--------|-----|--------|
+| `GET` | `/api/roles/:id/access` | daftar `Code` menu dan button yang diizinkan |
+| `PUT` | `/api/roles/:id/access` | mengganti seluruh izin role |
 
-Langkah berikutnya yang masuk akal adalah memindahkan akses ke database (tabel baru, misalnya `CORE_RoleAccess`, lewat migrasi) supaya bisa dibaca saat login dan dipakai untuk membatasi menu.
+Body `PUT`:
+
+```json
+{ "menus": ["all-issues", "settings"], "actions": ["all-issues.add"] }
+```
+
+`Code` yang tidak dikenal diabaikan. Button hanya disimpan kalau menu pemiliknya ikut diizinkan.
+
+### Memberi akses penuh
+
+```
+pnpm seed-access "Administrator"
+```
+
+Memberi satu role akses ke semua menu dan semua button. Berguna untuk admin pertama, atau kalau admin tidak sengaja mencabut aksesnya sendiri. Tanpa argumen, role yang dipakai adalah "Administrator".
 
 ## Cek data dari terminal
 

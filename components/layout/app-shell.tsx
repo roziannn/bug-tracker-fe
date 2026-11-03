@@ -1,11 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Bell, Bug, ChevronRight, ChevronsUpDown, CircleDot, CreditCard, FileSearch, FileSearch2, FolderKanban, FolderOpenDot, Gauge, KanbanSquare, LogOut, PencilLine, Plus, Settings, UserCircle2, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bell, Bug, ChevronRight, ChevronsUpDown, CreditCard, LogOut, Plus, UserCircle2 } from "lucide-react";
 import { useCurrentUser } from "@/components/app/user-provider";
+import { SidebarNavigation } from "@/components/layout/sidebar-navigation";
 import { NotificationDropdown } from "@/components/shared/navigation/notification-dropdown";
 import { ThemeToggle } from "@/components/shared/theme/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -20,18 +20,10 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
 import { appToast } from "@/lib/app-toast";
 
 type AppShellProps = {
@@ -47,58 +39,6 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-type NavigationChild = {
-  id: string;
-  label: string;
-  href?: string;
-  children?: readonly { id: string; label: string; href: string }[];
-};
-
-type NavigationItem = {
-  id: AppShellProps["activeNav"] | "settings-group";
-  label: string;
-  href?: string;
-  icon: typeof Gauge;
-  badge?: string;
-  children?: readonly NavigationChild[];
-};
-
-type CurrentUser = {
-  name: string;
-  email: string;
-};
-
-
-const navigation: readonly NavigationItem[] = [
-  { id: "overview", label: "Overview", href: "/", icon: Gauge },
-  { id: "issues", label: "All Issues", href: "/issues", icon: CircleDot, badge: "34" },
-  { id: "kanban", label: "Kanban", href: "/kanban", icon: KanbanSquare },
-  { id: "teams", label: "Teams", href: "/teams", icon: Users },
-  { id: "projects", label: "Projects", href: "/projects", icon: FolderOpenDot },
-  {
-    id: "settings-group",
-    label: "Settings",
-    icon: Settings,
-    children: [
-      { id: "role", label: "Role", href: "/settings/role" },
-      { id: "users", label: "Users", href: "/settings/users" },
-      { id: "menu", label: "Menu", href: "/settings/menu" },
-      { id: "environment", label: "Environment", href: "/settings/environment" },
-      {
-        id: "category",
-        label: "Kategori",
-        children: [
-          { id: "teams-domain", label: "Teams Domain", href: "/settings/category/teams-domain" },
-          { id: "project-status", label: "Project Status", href: "/settings/category/project-status" },
-          { id: "issue-status", label: "Issue Status", href: "/settings/category/issue-status" },
-          { id: "issue-priority", label: "Issue Priority", href: "/settings/category/issue-priority" },
-          { id: "audit-trail-outcome", label: "Audit Trail Outcome", href: "/settings/category/audit-trail-outcome" },
-        ],
-      },
-    ],
-  },
-  { id: "audit-trail", label: "Audit Trail", href: "/audit-trail", icon: FileSearch2 },
-] as const;
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -107,7 +47,6 @@ function getInitials(name: string): string {
 }
 
 export function AppShell({
-  activeNav,
   title,
   toolbar,
   showCreateIssueButton = false,
@@ -115,16 +54,8 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const resolvedBreadcrumbs = breadcrumbs?.length ? breadcrumbs : [{ label: title }];
-  const [isSettingsOpen, setIsSettingsOpen] = useState(pathname.startsWith("/settings"));
-  const [isCategoryOpen, setIsCategoryOpen] = useState(pathname.startsWith("/settings/category"));
   const { user, clearUser } = useCurrentUser();
-  useEffect(() => {
-    if (pathname.startsWith("/settings")) {
-      setIsSettingsOpen(true);
-    }
-  }, [pathname]);
 
  
 
@@ -166,90 +97,7 @@ export function AppShell({
           <SidebarGroup>
             <SidebarGroupLabel>Workspace</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
-                {navigation.map((item) => {
-                  const Icon = item.icon;
-                  const isSettingsGroup = item.id === "settings-group";
-                  const hasChildren = Boolean(item.children?.length);
-                  const isChildActive =
-                    item.children?.some(
-                      (child) => pathname === child.href || child.children?.some((grandchild) => pathname === grandchild.href)
-                    ) ?? false;
-                  const isActive = isSettingsGroup ? isChildActive : item.id === activeNav;
-
-                  return (
-                    <SidebarMenuItem key={item.label}>
-                      {hasChildren ? (
-                        <>
-                          <SidebarMenuButton
-                            isActive={isActive}
-                            onClick={() => setIsSettingsOpen((current) => !current)}
-                            tooltip={item.label}
-                            type="button"
-                          >
-                            <Icon />
-                            <span>{item.label}</span>
-                            <ChevronRight
-                              className={cn(
-                                "ml-auto transition-transform duration-200 group-data-[collapsible=icon]:hidden",
-                                isSettingsOpen && "rotate-90",
-                              )}
-                            />
-                          </SidebarMenuButton>
-                          {isSettingsOpen ? (
-                            <SidebarMenuSub>
-                              {item.children?.map((child) =>
-                                child.children ? (
-                                  <SidebarMenuSubItem key={child.id}>
-                                    <SidebarMenuSubButton
-                                      render={<button type="button" />}
-                                      onClick={() => setIsCategoryOpen((current) => !current)}
-                                    >
-                                      <span>{child.label}</span>
-                                      <ChevronRight
-                                        className={cn("ml-auto size-3.5 transition-transform", isCategoryOpen && "rotate-90")}
-                                      />
-                                    </SidebarMenuSubButton>
-                                    {isCategoryOpen ? (
-                                      <SidebarMenuSub>
-                                        {child.children.map((grandchild) => (
-                                          <SidebarMenuSubItem key={grandchild.id}>
-                                            <SidebarMenuSubButton
-                                              isActive={pathname === grandchild.href}
-                                              render={<Link href={grandchild.href} />}
-                                            >
-                                              <span>{grandchild.label}</span>
-                                            </SidebarMenuSubButton>
-                                          </SidebarMenuSubItem>
-                                        ))}
-                                      </SidebarMenuSub>
-                                    ) : null}
-                                  </SidebarMenuSubItem>
-                                ) : (
-                                  <SidebarMenuSubItem key={child.id}>
-                                    <SidebarMenuSubButton
-                                      isActive={pathname === child.href}
-                                      render={<Link href={child.href ?? "#"} />}
-                                    >
-                                      <span>{child.label}</span>
-                                    </SidebarMenuSubButton>
-                                  </SidebarMenuSubItem>
-                                )
-                              )}
-                            </SidebarMenuSub>
-                          ) : null}
-                        </>
-                      ) : (
-                        <SidebarMenuButton isActive={isActive} render={<Link href={item.href ?? "#"} />} tooltip={item.label}>
-                          <Icon />
-                          <span>{item.label}</span>
-                        </SidebarMenuButton>
-                      )}
-                      {"badge" in item && item.badge ? <SidebarMenuBadge>{item.badge}</SidebarMenuBadge> : null}
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
+              <SidebarNavigation />
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
@@ -278,6 +126,7 @@ export function AppShell({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
                   <p className="truncate text-xs text-muted-foreground">{displayEmail}</p>
+                  <p className="truncate text-xs text-muted-foreground">Role: {user?.role?.name ?? "No role assigned"}</p>
                 </div>
               </div>
               <DropdownMenuSeparator />

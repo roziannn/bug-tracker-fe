@@ -19,6 +19,8 @@ export interface Role extends AuditFields {
   NewId: string;
   Name: string;
   IsActive: boolean;
+  MenuCount?: number;
+  ActionCount?: number;
 }
 
 export interface RoleClaim extends AuditFields {
@@ -34,4 +36,25 @@ export interface Paged<T> {
   page: number;
   pageSize: number;
   total: number;
+}
+export interface RoleAccess {
+  menus: string[];
+  actions: string[];
+}
+
+export interface NavMenu {
+  id: string;
+  label: string;
+  parentId: string | null;
+  path: string;
+  icon: string;
+}
+
+export interface CurrentUser {
+  name: string;
+  email: string;
+  role: { id: number; name: string } | null;
+  menus: string[];
+  actions: string[];
+  navigation: NavMenu[];
 }
