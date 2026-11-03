@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseDateOnly } from "@/lib/date";
 
 export const loginSchema = z.object({
   email: z.string().trim().email("Invalid email format"),
@@ -95,3 +96,53 @@ export const categorySchema = z.object({
 export type CategoryInput = z.infer<typeof categorySchema>;
 
 export const categoryActiveSchema = z.object({ isActive: z.boolean() });
+
+function isHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+const dateOnly = z.string().refine((value) => parseDateOnly(value) !== null, "Date is invalid");
+
+export const createProjectSchema = z
+  .object({
+    name: z.string().trim().min(1, "Project name is required").max(150, "Project name must be at most 150 characters"),
+    ownerId: z.number({ error: "Owner is required" }).int().positive("Owner is required"),
+    description: z.string().trim().max(5000, "Description must be at most 5000 characters").default(""),
+    goLiveDate: z
+      .string()
+      .default("")
+      .refine((value) => value === "" || parseDateOnly(value) !== null, "Go Live date is invalid"),
+    tags: z.array(z.number().int().positive()).max(50, "Too many tags").default([]),
+    repositories: z.array(z.string().trim().max(255, "Repository must be at most 255 characters")).max(50, "Too many repositories").default([]),
+    environments: z.record(z.string(), z.string()).default({}),
+    phases: z
+      .array(
+        z
+          .object({
+            name: z.string().trim().min(1, "Phase name is required").max(100, "Phase name must be at most 100 characters"),
+            start: dateOnly,
+            end: dateOnly,
+          })
+          .refine((phase) => parseDateOnly(phase.end)! >= parseDateOnly(phase.start)!, {
+            message: "A phase end date must be on or after its start date",
+          })
+      )
+      .max(50, "Too many phases")
+      .default([]),
+  })
+  .superRefine((value, ctx) => {
+    for (const [environment, url] of Object.entries(value.environments)) {
+      if (environment.trim().length === 0 || environment.length > 50) {
+        ctx.addIssue({ code: "custom", message: "Environment name must be 1-50 characters", path: ["environments", environment] });
+      } else if (url.trim() && (url.trim().length > 500 || !isHttpUrl(url.trim()))) {
+        ctx.addIssue({ code: "custom", message: `${environment} URL must start with http:// or https://`, path: ["environments", environment] });
+      }
+    }
+  });
+
+export type CreateProjectInput = z.infer<typeof createProjectSchema>;

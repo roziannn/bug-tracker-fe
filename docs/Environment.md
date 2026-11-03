@@ -61,6 +61,7 @@ Semua endpoint butuh login.
 | `DELETE` | `/api/env/:id` | hapus variable |
 | `GET` | `/api/env/:id/value` | nilai asli satu variable |
 | `GET` | `/api/env/export?environment=Staging` | isi `.env` satu environment |
+| `GET` | `/api/env/environments` | nama environment saja (Development, Staging, Production, ditambah yang ada di tabel). Dipakai form Create Project |
 
 Body `POST`:
 

@@ -77,3 +77,40 @@ export interface Category extends AuditFields {
   Description: string;
   IsActive: boolean;
 }
+
+export interface Project extends AuditFields {
+  Id: number;
+  /** ID bergaya GUID, dipakai di URL. */
+  NewId: string;
+  Name: string;
+  OwnerId: number;
+  OwnerName: string;
+  Description: string;
+  GoLiveDate: string | null;
+  Tags: string[];
+  PhaseCount: number;
+  IsActive: boolean;
+}
+
+export interface ProjectPhase {
+  Id: number;
+  Name: string;
+  StartDate: string;
+  EndDate: string;
+  Sequence: number;
+}
+
+export interface ProjectDetail extends AuditFields {
+  Id: number;
+  NewId: string;
+  Name: string;
+  OwnerId: number;
+  OwnerName: string;
+  Description: string;
+  GoLiveDate: string | null;
+  IsActive: boolean;
+  Tags: { Id: number; Name: string }[];
+  Phases: ProjectPhase[];
+  Repositories: string[];
+  Environments: { Environment: string; Url: string }[];
+}

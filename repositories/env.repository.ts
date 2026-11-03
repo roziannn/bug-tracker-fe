@@ -1,4 +1,5 @@
 import { query } from "@/lib/db";
+import { STANDARD_ENVIRONMENTS } from "@/features/settings/data/environments";
 import type { CreateEnvVarInput, UpdateEnvVarInput } from "@/lib/validation";
 import type { EnvVar } from "@/types";
 
@@ -82,4 +83,15 @@ export async function updateEnvVar(
 export async function deleteEnvVar(id: number): Promise<boolean> {
   const rows = await query(`DELETE FROM "CORE_Env" WHERE "Id" = $1 RETURNING "Id"`, [id]);
   return rows.length > 0;
+}
+
+// Nama environment untuk pilihan di form: yang standar dulu, lalu yang ada di CORE_Env (tanpa membedakan huruf besar/kecil).
+export async function getEnvironmentNames(): Promise<string[]> {
+  const rows = await query<{ Environment: string }>(`SELECT DISTINCT "Environment" FROM "CORE_Env" ORDER BY "Environment"`);
+
+  const byLowerCase = new Map<string, string>();
+  for (const name of [...STANDARD_ENVIRONMENTS, ...rows.map((row) => row.Environment)]) {
+    if (!byLowerCase.has(name.toLowerCase())) byLowerCase.set(name.toLowerCase(), name);
+  }
+  return Array.from(byLowerCase.values());
 }

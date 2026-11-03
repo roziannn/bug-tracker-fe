@@ -19,13 +19,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
+import { STANDARD_ENVIRONMENTS } from "@/features/settings/data/environments";
 import { appToast } from "@/lib/app-toast";
 import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { EnvVar } from "@/types";
 
-// Selalu tampil di daftar environment, walaupun belum punya variable di database.
-const STANDARD_ENVIRONMENTS = ["Development", "Staging", "Production"];
 const KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 const COLUMNS = 6;
 
