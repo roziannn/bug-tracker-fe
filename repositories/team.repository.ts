@@ -14,7 +14,7 @@ const TEAM_SELECT = `SELECT t."Id", t."NewId", t."DomainId", c."Name" AS "Domain
   JOIN "CORE_Category" c ON c."Id" = t."DomainId"
   JOIN "CORE_User" u ON u."Id" = t."LeadId"`;
 
-const MEMBER_SELECT = `SELECT m."Id", m."TeamId", m."UserId", u."Name", u."Email", m."Role", m."AccessLevel", m."IsActive",
+const MEMBER_SELECT = `SELECT m."Id", m."TeamId", m."UserId", u."Name", u."Email", m."AccessLevel", m."IsActive",
     m."CreatedBy", m."CreatedDate", m."UpdatedBy", m."UpdatedDate"
   FROM "CORE_TeamMember" m
   JOIN "CORE_User" u ON u."Id" = m."UserId"`;
@@ -127,9 +127,9 @@ export async function addTeamMember(teamNewId: string, input: CreateTeamMemberIn
 
   try {
     const rows = await query<{ Id: number }>(
-      `INSERT INTO "CORE_TeamMember" ("TeamId", "UserId", "Role", "AccessLevel", "CreatedBy", "CreatedDate")
-       VALUES ($1, $2, $3, $4, $5, now()) RETURNING "Id"`,
-      [teamId, input.userId, input.role, input.accessLevel, createdBy]
+      `INSERT INTO "CORE_TeamMember" ("TeamId", "UserId", "AccessLevel", "CreatedBy", "CreatedDate")
+       VALUES ($1, $2, $3, $4, now()) RETURNING "Id"`,
+      [teamId, input.userId, input.accessLevel, createdBy]
     );
     return (await getMemberById(rows[0].Id))!;
   } catch (err) {
@@ -138,7 +138,7 @@ export async function addTeamMember(teamNewId: string, input: CreateTeamMemberIn
   }
 }
 
-// Orangnya (user) tidak bisa diganti; yang diubah role, access level, dan status aktif.
+// Orangnya (user) tidak bisa diganti; yang diubah access level dan status aktif.
 export async function updateTeamMember(
   teamNewId: string,
   memberId: number,
@@ -150,9 +150,9 @@ export async function updateTeamMember(
 
   const rows = await query(
     `UPDATE "CORE_TeamMember"
-     SET "Role" = $1, "AccessLevel" = $2, "IsActive" = COALESCE($3, "IsActive"), "UpdatedBy" = $4, "UpdatedDate" = now()
-     WHERE "Id" = $5 AND "TeamId" = $6 RETURNING "Id"`,
-    [input.role, input.accessLevel, input.isActive ?? null, updatedBy, memberId, teamId]
+     SET "AccessLevel" = $1, "IsActive" = COALESCE($2, "IsActive"), "UpdatedBy" = $3, "UpdatedDate" = now()
+     WHERE "Id" = $4 AND "TeamId" = $5 RETURNING "Id"`,
+    [input.accessLevel, input.isActive ?? null, updatedBy, memberId, teamId]
   );
   return rows[0] ? (await getMemberById(memberId))! : "member-not-found";
 }

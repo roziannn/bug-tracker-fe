@@ -143,8 +143,6 @@ export const coreTeamMember = pgTable(
     UserId: integer("UserId")
       .notNull()
       .references(() => coreUser.Id, { onDelete: "restrict" }),
-    // Admin, Lead, Engineer, atau QA (lihat features/teams/data/team-options.ts).
-    Role: varchar("Role", { length: 20 }).notNull().default("Engineer"),
     // member, lead, atau observer.
     AccessLevel: varchar("AccessLevel", { length: 20 }).notNull().default("member"),
     ...auditColumns,

@@ -13,7 +13,7 @@ Halaman Teams memakai database. Ada tiga halaman:
 - **Satu group team per Teams Domain.** Group team tidak punya nama sendiri: **domain-nya sekaligus menjadi namanya** (misalnya domain "Backend" berarti group team "Backend"). Domain berasal dari nilai kategori **Teams Domain** di Settings → Categories, jadi tidak ada lagi isian "Group name".
 - **Lead** dipilih dari user lewat dropdown yang bisa dicari (nama atau email).
 - **Status Active / Inactive** menggantikan SLA. Group yang nonaktif tetap tampil, redup dan berlabel Inactive.
-- **Anggota** adalah user. Tiap anggota punya Role dan Access level.
+- **Anggota** adalah user. Tiap anggota punya Access level (Member, Lead, atau Observer). Tidak ada isian Role terpisah.
 
 ## Tabel
 
@@ -36,7 +36,6 @@ Didefinisikan di [db/schema/core.ts](../db/schema/core.ts). Berawalan `CORE_` ka
 | `Id` | integer, identity | primary key |
 | `TeamId` | integer | group team (`CORE_Team.Id`), ikut terhapus kalau group-nya dihapus |
 | `UserId` | integer | user yang menjadi anggota (`CORE_User.Id`) |
-| `Role` | varchar(20) | `Admin`, `Lead`, `Engineer`, atau `QA`. Default `Engineer` |
 | `AccessLevel` | varchar(20) | `member`, `lead`, atau `observer`. Default `member` |
 | kolom audit | | sama seperti di atas |
 
@@ -47,7 +46,7 @@ Pasangan `TeamId` dan `UserId` unik: satu user hanya bisa jadi anggota satu kali
 - **Domain**: harus nilai Teams Domain yang aktif dan belum dipakai group lain. Saat mengedit, domain milik group itu sendiri tetap boleh walau sudah dinonaktifkan. Dropdown Domain hanya menawarkan domain yang masih bebas.
 - **Lead**: harus user yang aktif. Lead yang akunnya kemudian dinonaktifkan tetap tampil di form edit.
 - **Jumlah anggota** di daftar menghitung anggota yang **aktif** saja.
-- **Anggota**: hanya user aktif yang bisa ditambahkan, dan yang sudah jadi anggota tidak ditawarkan lagi. Orangnya tidak bisa diganti saat edit, hanya Role, Access level, dan status aktif.
+- **Anggota**: hanya user aktif yang bisa ditambahkan, dan yang sudah jadi anggota tidak ditawarkan lagi. Orangnya tidak bisa diganti saat edit, hanya Access level dan status aktif.
 - **Lead tidak otomatis menjadi anggota.** Tambahkan lewat halaman Add Members kalau perlu.
 - **Group tidak bisa dihapus**, hanya dinonaktifkan.
 - **Nilai Teams Domain yang dipakai group tidak bisa dihapus** di Settings → Categories (muncul pesan bahwa nilai itu sedang dipakai). Nonaktifkan saja kalau tidak ingin dipakai lagi.
@@ -58,7 +57,7 @@ Pasangan `TeamId` dan `UserId` unik: satu user hanya bisa jadi anggota satu kali
 
 **Teams**: tabel Team, Lead, Members, Status, Created by (kosong tampil "System"), Created date, dan tombol **Add member**.
 
-**Add Members**: tabel Name, Email, Team, Role, Access level, Created by, Created date, Active (switch), dan ikon edit. Dialog tambah berisi User (dropdown yang bisa dicari), Role, dan Access level.
+**Add Members**: tabel Name, Email, Team, Access level, Created by, Created date, Active (switch), dan ikon edit. Dialog tambah berisi User (dropdown yang bisa dicari) dan Access level.
 
 Semua halaman memakai skeleton saat data dimuat.
 
@@ -78,15 +77,15 @@ Semua endpoint butuh login. `:id` adalah `NewId` (GUID) group team.
 | `PUT` | `/api/teams/:id` | ubah domain dan lead |
 | `PATCH` | `/api/teams/:id` | aktif / nonaktif. Body `{ "isActive": false }` |
 | `GET` | `/api/teams/:id/members` | anggota sebuah group |
-| `POST` | `/api/teams/:id/members` | tambah anggota. Body `{ "userId": 1, "role": "Engineer", "accessLevel": "member" }` |
-| `PUT` | `/api/teams/:id/members/:memberId` | ubah role dan access level (`isActive` opsional) |
+| `POST` | `/api/teams/:id/members` | tambah anggota. Body `{ "userId": 1, "accessLevel": "member" }` |
+| `PUT` | `/api/teams/:id/members/:memberId` | ubah access level (`isActive` opsional) |
 | `PATCH` | `/api/teams/:id/members/:memberId` | aktif / nonaktif anggota |
 
 Error:
 
 | Status | Penyebab |
 |--------|----------|
-| 400 | domain atau lead tidak valid, user tidak aktif, role atau access level salah |
+| 400 | domain atau lead tidak valid, user tidak aktif, atau access level salah |
 | 404 | group atau anggota tidak ditemukan, atau `:id` bukan GUID |
 | 409 | domain sudah punya group, atau user sudah jadi anggota |
 | 401 | belum login |
@@ -101,5 +100,5 @@ Error:
 | [lib/validation.ts](../lib/validation.ts) | `teamSchema`, `createTeamMemberSchema`, `updateTeamMemberSchema` |
 | [app/api/teams/](../app/api/teams) | route API |
 | [features/teams/components/](../features/teams/components) | tiga halaman |
-| [features/teams/data/team-options.ts](../features/teams/data/team-options.ts) | daftar Role dan Access level |
+| [features/teams/data/team-options.ts](../features/teams/data/team-options.ts) | daftar Access level |
 | [lib/request.ts](../lib/request.ts) | pemanggil API sisi browser |

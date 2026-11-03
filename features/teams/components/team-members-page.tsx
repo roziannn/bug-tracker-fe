@@ -15,15 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
-import {
-  ACCESS_LEVELS,
-  ACCESS_LEVEL_LABELS,
-  DEFAULT_ACCESS_LEVEL,
-  DEFAULT_TEAM_ROLE,
-  TEAM_ROLES,
-  type AccessLevel,
-  type TeamRole,
-} from "@/features/teams/data/team-options";
+import { ACCESS_LEVELS, ACCESS_LEVEL_LABELS, DEFAULT_ACCESS_LEVEL, type AccessLevel } from "@/features/teams/data/team-options";
 import { appToast } from "@/lib/app-toast";
 import { formatDate } from "@/lib/date";
 import { requestJson } from "@/lib/request";
@@ -31,12 +23,12 @@ import { cn } from "@/lib/utils";
 import type { Paged, Team, TeamMember, User } from "@/types";
 
 const PAGE_SIZE = 10;
-const COLUMNS = 9;
+const COLUMNS = 8;
 
 // id = Id anggota yang sedang diedit, null kalau menambah baru.
-type Draft = { id: number | null; name: string; userId: string | null; role: TeamRole; accessLevel: AccessLevel };
+type Draft = { id: number | null; name: string; userId: string | null; accessLevel: AccessLevel };
 
-const emptyDraft: Draft = { id: null, name: "", userId: null, role: DEFAULT_TEAM_ROLE, accessLevel: DEFAULT_ACCESS_LEVEL };
+const emptyDraft: Draft = { id: null, name: "", userId: null, accessLevel: DEFAULT_ACCESS_LEVEL };
 
 type TeamState = { status: "loading" } | { status: "notFound" } | { status: "error" } | { status: "ready"; team: Team };
 
@@ -113,11 +105,10 @@ export function TeamMembersPage({ id }: { id: string }) {
     setSaving(true);
     try {
       if (draft.id !== null) {
-        await requestJson(`/api/teams/${id}/members/${draft.id}`, "PUT", { role: draft.role, accessLevel: draft.accessLevel });
+        await requestJson(`/api/teams/${id}/members/${draft.id}`, "PUT", { accessLevel: draft.accessLevel });
       } else {
         await requestJson(`/api/teams/${id}/members`, "POST", {
           userId: Number(draft.userId),
-          role: draft.role,
           accessLevel: draft.accessLevel,
         });
       }
@@ -219,7 +210,6 @@ export function TeamMembersPage({ id }: { id: string }) {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Team</TableHead>
-                  <TableHead>Role</TableHead>
                   <TableHead>Access level</TableHead>
                   <TableHead>Created by</TableHead>
                   <TableHead>Created date</TableHead>
@@ -235,7 +225,6 @@ export function TeamMembersPage({ id }: { id: string }) {
                         <TableCell className="font-medium">{member.Name}</TableCell>
                         <TableCell className="text-muted-foreground">{member.Email}</TableCell>
                         <TableCell className="text-muted-foreground">{teamName}</TableCell>
-                        <TableCell>{member.Role}</TableCell>
                         <TableCell>{ACCESS_LEVEL_LABELS[member.AccessLevel as AccessLevel] ?? member.AccessLevel}</TableCell>
                         <TableCell className="text-muted-foreground">{member.CreatedBy || "System"}</TableCell>
                         <TableCell className="text-muted-foreground">{formatDate(member.CreatedDate)}</TableCell>
@@ -267,7 +256,6 @@ export function TeamMembersPage({ id }: { id: string }) {
                                 id: member.Id,
                                 name: member.Name,
                                 userId: String(member.UserId),
-                                role: (TEAM_ROLES.find((item) => item === member.Role) ?? DEFAULT_TEAM_ROLE) as TeamRole,
                                 accessLevel: (ACCESS_LEVELS.find((item) => item === member.AccessLevel) ?? DEFAULT_ACCESS_LEVEL) as AccessLevel,
                               })
                             }
@@ -306,7 +294,7 @@ export function TeamMembersPage({ id }: { id: string }) {
             <DialogHeader>
               <DialogTitle>{isEditing ? "Edit member" : "Add member"}</DialogTitle>
               <DialogDescription>
-                {isEditing ? `Update ${draft?.name}'s role in ${teamName}.` : `Add a person to the ${teamName} team.`}
+                {isEditing ? `Update ${draft?.name}'s access level in ${teamName}.` : `Add a person to the ${teamName} team.`}
               </DialogDescription>
             </DialogHeader>
 
@@ -331,22 +319,6 @@ export function TeamMembersPage({ id }: { id: string }) {
                     />
                   </div>
                 )}
-
-                <div className="grid gap-2">
-                  <Label htmlFor="member-role">Role</Label>
-                  <Select value={draft.role} onValueChange={(value) => setDraft({ ...draft, role: value as TeamRole })}>
-                    <SelectTrigger className="w-full" id="member-role">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TEAM_ROLES.map((role) => (
-                        <SelectItem key={role} value={role}>
-                          {role}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="member-access">Access level</Label>

@@ -144,7 +144,6 @@ export interface TeamMember extends AuditFields {
   UserId: number;
   Name: string;
   Email: string;
-  Role: string;
   AccessLevel: string;
   IsActive: boolean;
 }
