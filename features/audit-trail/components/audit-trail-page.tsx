@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Activity, Download, Lock, Search, ShieldCheck, ShieldX } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import { formatDateTime } from "@/lib/date";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -11,40 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
-import { auditTrailEntries, type AuditTrailAction, type AuditTrailEntry, type AuditTrailOutcome } from "@/features/bug-tracker/data/bug-tracker-data";
+import type { AuditTrailAction, AuditTrailEntry, AuditTrailOutcome } from "@/features/bug-tracker/data/bug-tracker-data";
 
 const PAGE_SIZE = 8;
 
 type OutcomeFilter = AuditTrailOutcome | "all";
 type ActionFilter = AuditTrailAction | "all";
 type TeamFilter = string | "all";
-
-const stats = [
-  {
-    title: "Total events",
-    value: String(auditTrailEntries.length),
-    note: "Recorded from issue, project, and access changes",
-    icon: Activity,
-  },
-  {
-    title: "Privileged changes",
-    value: String(auditTrailEntries.filter((entry) => entry.action === "Permission changed" || entry.action === "Role updated").length),
-    note: "Role and permission updates requiring audit visibility",
-    icon: ShieldCheck,
-  },
-  {
-    title: "Warnings",
-    value: String(auditTrailEntries.filter((entry) => entry.outcome === "Warning").length),
-    note: "Events that need extra review or follow-up",
-    icon: Lock,
-  },
-  {
-    title: "Blocked attempts",
-    value: String(auditTrailEntries.filter((entry) => entry.outcome === "Blocked").length),
-    note: "Access changes or login attempts denied by policy",
-    icon: ShieldX,
-  },
-] as const;
 
 function formatTimestamp(dateString: string) {
   return formatDateTime(dateString);
@@ -57,8 +30,8 @@ function outcomeVariant(outcome: AuditTrailOutcome): "default" | "secondary" | "
 }
 
 function exportAuditTrailToCsv(rows: AuditTrailEntry[]) {
-  const headers = ["Audit ID", "Actor", "Role", "Action", "Target", "Team", "Outcome", "IP Address", "Timestamp", "Detail"];
-  const values = rows.map((entry) => [entry.id, entry.actor, entry.actorRole, entry.action, `${entry.targetType}: ${entry.targetName}`, entry.team, entry.outcome, entry.ipAddress, entry.createdAt, entry.detail]);
+  const headers = ["Audit ID", "Actor", "Role", "Action", "Target", "Team", "Outcome", "Timestamp", "Detail"];
+  const values = rows.map((entry) => [entry.id, entry.actor, entry.actorRole, entry.action, `${entry.targetType}: ${entry.targetName}`, entry.team, entry.outcome, entry.createdAt, entry.detail]);
 
   const csv = [headers, ...values].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
 
@@ -72,15 +45,15 @@ function exportAuditTrailToCsv(rows: AuditTrailEntry[]) {
   URL.revokeObjectURL(url);
 }
 
-export function AuditTrailPage() {
+export function AuditTrailPage({ initialEntries }: { initialEntries: AuditTrailEntry[] }) {
+  const [auditTrailEntries] = useState<AuditTrailEntry[]>(initialEntries);
   const [searchQuery, setSearchQuery] = useState("");
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
   const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("all");
   const [page, setPage] = useState(1);
-
   const actionOptions = Array.from(new Set(auditTrailEntries.map((entry) => entry.action)));
-  const teamOptions = Array.from(new Set(auditTrailEntries.map((entry) => entry.team)));
+  const teamOptions = Array.from(new Set(auditTrailEntries.map((entry) => entry.team).filter(Boolean)));
 
   const filteredEntries = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -91,7 +64,7 @@ export function AuditTrailPage() {
       const matchesTeam = teamFilter === "all" || entry.team === teamFilter;
       const matchesSearch =
         !normalizedQuery ||
-        entry.id.toLowerCase().includes(normalizedQuery) ||
+        String(entry.id).toLowerCase().includes(normalizedQuery) ||
         entry.actor.toLowerCase().includes(normalizedQuery) ||
         entry.targetName.toLowerCase().includes(normalizedQuery) ||
         entry.detail.toLowerCase().includes(normalizedQuery);
@@ -205,9 +178,8 @@ export function AuditTrailPage() {
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Action</TableHead>
-                  <TableHead>Target</TableHead>
+                  <TableHead>Note</TableHead>
                   <TableHead>Outcome</TableHead>
-                  <TableHead>IP Address</TableHead>
                   <TableHead>Timestamp</TableHead>
                 </TableRow>
               </TableHeader>
@@ -221,20 +193,19 @@ export function AuditTrailPage() {
                       <TableCell className="align-top whitespace-normal wrap-break-word">{entry.action}</TableCell>
                       <TableCell className="align-top whitespace-normal wrap-break-word">
                         <div className="space-y-1">
-                          <p className="font-medium">{entry.targetName}</p>
+                          <p className="font-medium">{entry.detail}</p>
                         </div>
                       </TableCell>
                       <TableCell className="align-top whitespace-normal">
                         <Badge variant={outcomeVariant(entry.outcome)}>{entry.outcome}</Badge>
                       </TableCell>
-                      <TableCell className="align-top text-muted-foreground whitespace-normal wrap-break-word">{entry.ipAddress}</TableCell>
                       <TableCell className="align-top text-muted-foreground whitespace-normal wrap-break-word">{formatTimestamp(entry.createdAt)}</TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                      No audit events match the current filters.
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                      "No audit events match the current filters."
                     </TableCell>
                   </TableRow>
                 )}

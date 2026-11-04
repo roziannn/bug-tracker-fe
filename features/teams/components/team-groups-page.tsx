@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { SearchSelect } from "@/components/ui/search-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { appToast } from "@/lib/app-toast";
 import { formatDate } from "@/lib/date";
 import { requestJson } from "@/lib/request";
@@ -23,6 +24,7 @@ import type { Category, Paged, Team, User } from "@/types";
 type Draft = { id: string | null; domainId: string | null; leadId: string | null };
 
 const emptyDraft: Draft = { id: null, domainId: null, leadId: null };
+const PAGE_SIZE = 5;
 
 export function TeamGroupsPage() {
   // null = masih dimuat
@@ -32,6 +34,10 @@ export function TeamGroupsPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil((teams?.length ?? 0) / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedTeams = (teams ?? []).slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const isEditing = draft?.id != null;
 
   const loadTeams = useCallback(async () => {
@@ -167,7 +173,7 @@ export function TeamGroupsPage() {
               ? [0, 1, 2].map((row) => <Skeleton key={row} className="h-[88px] w-full rounded-xl" aria-hidden="true" />)
               : null}
 
-            {(teams ?? []).map((team) => (
+            {paginatedTeams.map((team) => (
               <div key={team.NewId} className={cn("rounded-xl border p-4", !team.IsActive && "opacity-60")}>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-1">
@@ -217,6 +223,15 @@ export function TeamGroupsPage() {
                 </div>
               </div>
             ))}
+            {teams?.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">No group teams yet.</p> : null}
+            {teams && teams.length > PAGE_SIZE ? (
+              <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, teams.length)} of {teams.length} group teams
+                </p>
+                <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
+              </div>
+            ) : null}
 
             {teams !== null && teams.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">

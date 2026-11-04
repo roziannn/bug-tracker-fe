@@ -89,6 +89,12 @@ export type ProjectMetric = {
 };
 
 export type AuditTrailAction =
+  | "Created"
+  | "Updated"
+  | "Deleted"
+  | "Login"
+  | "Login failed"
+  | "Logout"
   | "Issue updated"
   | "Assignment changed"
   | "Status changed"
@@ -99,7 +105,28 @@ export type AuditTrailAction =
   | "Login attempt";
 
 export type AuditTrailTarget =
+  | "Authentication"
+  | "CORE_Category"
+  | "CORE_Env"
+  | "CORE_Menu"
+  | "CORE_MenuAction"
+  | "CORE_Role"
+  | "CORE_RoleClaim"
+  | "CORE_RoleMenu"
+  | "CORE_RoleMenuAction"
+  | "CORE_Team"
+  | "CORE_TeamMember"
+  | "CORE_User"
+  | "DATA_IssueActivity"
+  | "DATA_IssueComments"
   | "Issue"
+  | "DATA_Issues"
+  | "DATA_Kanban"
+  | "DATA_ProjectEnvironments"
+  | "DATA_ProjectPhases"
+  | "DATA_ProjectRepositories"
+  | "DATA_ProjectTags"
+  | "DATA_Projects"
   | "Project"
   | "Team"
   | "Workspace"
