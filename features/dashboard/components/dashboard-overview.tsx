@@ -1,22 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { CircleDot, GitBranch, ListFilter, ShieldAlert, Sparkles } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Cell, Label, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { useEffect, useMemo, useState } from "react";
+import { CircleDot, GitBranch, ShieldAlert, Sparkles } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, Label, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { Avatar, AvatarFallback, AvatarGroup } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { issues, overviewCards, priorityVariant, statusVariant } from "@/features/bug-tracker/data/bug-tracker-data";
+import { priorityVariant, statusVariant } from "@/features/bug-tracker/data/bug-tracker-data";
 
 const iconMap = {
   "circle-dot": CircleDot,
@@ -29,18 +25,6 @@ const teamChartConfig = {
   total: {
     label: "Issues",
     color: "var(--color-chart-1)",
-  },
-  Frontend: {
-    label: "Frontend",
-    color: "var(--color-chart-1)",
-  },
-  Platform: {
-    label: "Platform",
-    color: "var(--color-chart-2)",
-  },
-  Core: {
-    label: "Core",
-    color: "var(--color-chart-3)",
   },
 } satisfies ChartConfig;
 
@@ -66,30 +50,10 @@ const priorityChartConfig = {
   },
 } satisfies ChartConfig;
 
-const statusChartConfig = {
-  total: {
-    label: "Issues",
-    color: "var(--color-chart-5)",
-  },
-  Backlog: {
-    label: "Backlog",
-    color: "var(--color-chart-5)",
-  },
-  Ready: {
-    label: "Ready",
-    color: "var(--color-chart-2)",
-  },
-  Investigating: {
-    label: "Investigating",
-    color: "var(--color-chart-4)",
-  },
-  "In review": {
-    label: "In review",
+const kanbanChartConfig = {
+  cards: {
+    label: "Kanban cards",
     color: "var(--color-chart-1)",
-  },
-  Done: {
-    label: "Done",
-    color: "var(--color-chart-3)",
   },
 } satisfies ChartConfig;
 
@@ -97,37 +61,19 @@ const priorityOrder = ["Critical", "High", "Medium", "Low"] as const;
 const statusOrder = ["Backlog", "Ready", "Investigating", "In review", "Done"] as const;
 type PriorityKey = (typeof priorityOrder)[number];
 
-const issuesByTeam = Object.entries(
-  issues.reduce<Record<string, number>>((accumulator, issue) => {
-    accumulator[issue.team] = (accumulator[issue.team] ?? 0) + 1;
-    return accumulator;
-  }, {}),
-)
-  .map(([team, total]) => ({
-    team,
-    total,
-    fill: `var(--color-${team})`,
-  }))
-  .sort((left, right) => right.total - left.total);
-
-const issuesByPriority = priorityOrder.map((priority) => ({
-  priority,
-  count: issues.filter((issue) => issue.priority === priority).length,
-  fill: `var(--color-${priority})`,
-}));
-
-const issuesByStatus = statusOrder.map((status) => ({
-  status,
-  total: issues.filter((issue) => issue.status === status).length,
-  fill: statusChartConfig[status].color,
-}));
-
-const totalIssues = issues.length;
-const urgentIssues = issues.filter((issue) => issue.priority === "Critical" || issue.priority === "High").length;
-const busiestTeam = issuesByTeam[0];
-const urgentWatchlist = issues.filter((issue) => issue.priority === "Critical" || issue.priority === "High");
-const busiestStatus = [...issuesByStatus].sort((left, right) => right.total - left.total)[0];
 const WATCHLIST_PAGE_SIZE = 5;
+const KANBAN_STATUS_ORDER = ["Backlog", "Ready", "Investigating", "In review", "Done"];
+
+type KanbanCardRecord = { id: string; status: string };
+type ActualIssueSummary = {
+  id: string;
+  title: string;
+  status: string;
+  team: string | null;
+  pic: string | null;
+  criticality: string;
+  resolvedAt: string | null;
+};
 
 function getPriorityLabel(priority: PriorityKey) {
   return priorityChartConfig[priority].label ?? priority;
@@ -135,6 +81,137 @@ function getPriorityLabel(priority: PriorityKey) {
 
 export function DashboardOverview() {
   const [watchlistPage, setWatchlistPage] = useState(1);
+  const [kanbanCards, setKanbanCards] = useState<KanbanCardRecord[]>([]);
+  const [kanbanLoading, setKanbanLoading] = useState(true);
+  const [actualIssues, setActualIssues] = useState<ActualIssueSummary[]>([]);
+  const [issuesLoading, setIssuesLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/issues", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Unable to load issues"))))
+      .then((data: unknown) => {
+        if (active && Array.isArray(data)) {
+          setActualIssues(data.filter((issue): issue is ActualIssueSummary =>
+            typeof issue?.id === "string" && typeof issue?.title === "string" &&
+            typeof issue?.status === "string" &&
+            (typeof issue?.team === "string" || issue?.team === null) &&
+            (typeof issue?.pic === "string" || issue?.pic === null) &&
+            typeof issue?.criticality === "string" &&
+            (typeof issue?.resolvedAt === "string" || issue?.resolvedAt === null),
+          ));
+        }
+      })
+      .catch(() => {
+        if (active) setActualIssues([]);
+      })
+      .finally(() => {
+        if (active) setIssuesLoading(false);
+      });
+
+    return () => { active = false; };
+  }, []);
+
+  const issuesByTeam = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const issue of actualIssues) {
+      const team = issue.team?.trim() || "Unassigned";
+      counts.set(team, (counts.get(team) ?? 0) + 1);
+    }
+    return [...counts].map(([team, total]) => ({ team, total, fill: "var(--color-chart-1)" }))
+      .sort((left, right) => right.total - left.total);
+  }, [actualIssues]);
+
+  const issuesByStatus = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const issue of actualIssues) counts.set(issue.status, (counts.get(issue.status) ?? 0) + 1);
+    const known = statusOrder.filter((status) => counts.has(status));
+    const custom = [...counts.keys()].filter((status) => !statusOrder.includes(status as (typeof statusOrder)[number]));
+    return [...known, ...custom].map((status, index) => ({
+      status,
+      total: counts.get(status) ?? 0,
+      fill: `var(--color-chart-${(index % 5) + 1})`,
+    }));
+  }, [actualIssues]);
+
+  const issuesByPriority = useMemo(() => {
+    const priorityForCriticality: Record<string, PriorityKey> = {
+      "Tier 1 - Critical": "Critical",
+      "Tier 2 - Major": "High",
+      "Tier 3 - Moderate": "Medium",
+      "Tier 4 - Minor": "Low",
+    };
+    return priorityOrder.map((priority) => ({
+      priority,
+      count: actualIssues.filter((issue) => priorityForCriticality[issue.criticality] === priority).length,
+      fill: priorityChartConfig[priority].color ?? "var(--color-chart-1)",
+    }));
+  }, [actualIssues]);
+
+  const totalIssues = actualIssues.length;
+  const urgentIssues = issuesByPriority
+    .filter((entry) => entry.priority === "Critical" || entry.priority === "High")
+    .reduce((total, entry) => total + entry.count, 0);
+  const urgentWatchlist = useMemo(() => actualIssues
+    .filter((issue) => issue.criticality === "Tier 1 - Critical" || issue.criticality === "Tier 2 - Major")
+    .sort((left, right) => {
+      const leftRank = left.criticality === "Tier 1 - Critical" ? 0 : 1;
+      const rightRank = right.criticality === "Tier 1 - Critical" ? 0 : 1;
+      return leftRank - rightRank;
+    }), [actualIssues]);
+  const resolvedThisWeek = useMemo(() => {
+    const startOfWeek = new Date();
+    startOfWeek.setHours(0, 0, 0, 0);
+    const daysSinceMonday = (startOfWeek.getDay() + 6) % 7;
+    startOfWeek.setDate(startOfWeek.getDate() - daysSinceMonday);
+    return actualIssues.filter((issue) => {
+      if (issue.status !== "Done" || !issue.resolvedAt) return false;
+      const resolvedAt = new Date(issue.resolvedAt);
+      return !Number.isNaN(resolvedAt.getTime()) && resolvedAt >= startOfWeek;
+    }).length;
+  }, [actualIssues]);
+  const actualOverviewCards = [
+    { label: "Open bugs", value: actualIssues.filter((issue) => issue.status !== "Draft" && issue.status !== "Done").length, change: "Live", note: "Issues not yet resolved", icon: "circle-dot" as const },
+    { label: "Critical issues", value: issuesByPriority.find((issue) => issue.priority === "Critical")?.count ?? 0, change: "Tier 1", note: "Criticality: Tier 1", icon: "shield-alert" as const },
+    { label: "In progress", value: actualIssues.filter((issue) => issue.status === "Investigating" || issue.status === "In review").length, change: "Live", note: "Investigating or in review", icon: "git-branch" as const },
+    { label: "Resolved this week", value: resolvedThisWeek, change: "This week", note: "Issues moved to Done", icon: "sparkles" as const },
+  ];
+
+  const actualStatusChartConfig = useMemo(() => ({
+    total: { label: "Issues", color: "var(--color-chart-1)" },
+    ...Object.fromEntries(issuesByStatus.map(({ status, fill }) => [status, { label: status, color: fill }])),
+  }) satisfies ChartConfig, [issuesByStatus]);
+  const busiestTeam = issuesByTeam[0];
+  const busiestStatus = [...issuesByStatus].sort((left, right) => right.total - left.total)[0];
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/kanban", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Unable to load Kanban cards"))))
+      .then((data: unknown) => {
+        if (active && Array.isArray(data)) {
+          setKanbanCards(data.filter((card): card is KanbanCardRecord =>
+            typeof card?.id === "string" && typeof card?.status === "string",
+          ));
+        }
+      })
+      .catch(() => {
+        if (active) setKanbanCards([]);
+      })
+      .finally(() => {
+        if (active) setKanbanLoading(false);
+      });
+
+    return () => { active = false; };
+  }, []);
+
+  const kanbanByStatus = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const card of kanbanCards) counts.set(card.status, (counts.get(card.status) ?? 0) + 1);
+    const known = KANBAN_STATUS_ORDER.filter((status) => counts.has(status));
+    const custom = [...counts.keys()].filter((status) => !KANBAN_STATUS_ORDER.includes(status));
+    return [...known, ...custom].map((status) => ({ status, cards: counts.get(status) ?? 0 }));
+  }, [kanbanCards]);
   const watchlistPageCount = Math.ceil(urgentWatchlist.length / WATCHLIST_PAGE_SIZE);
   const watchlistStartIndex = (watchlistPage - 1) * WATCHLIST_PAGE_SIZE;
   const paginatedWatchlist = urgentWatchlist.slice(
@@ -148,49 +225,18 @@ export function DashboardOverview() {
       eyebrow="Sprint board"
       title="Product Quality Dashboard"
       toolbar={
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Issue monitoring and triage</h2>
             <p className="text-sm text-muted-foreground">
               Pantau daftar issue, prioritas, dan workflow triage dalam satu tampilan.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Select defaultValue="all">
-              <SelectTrigger>
-                <ListFilter />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="review">In review</SelectItem>
-                <SelectItem value="done">Resolved</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select defaultValue="sprint-12">
-              <SelectTrigger>
-                <SelectValue placeholder="Sprint" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sprint-12">Sprint 12</SelectItem>
-                <SelectItem value="sprint-11">Sprint 11</SelectItem>
-                <SelectItem value="backlog">Backlog</SelectItem>
-              </SelectContent>
-            </Select>
-            <AvatarGroup>
-              {["RA", "MI", "AL"].map((name) => (
-                <Avatar key={name} size="sm">
-                  <AvatarFallback>{name}</AvatarFallback>
-                </Avatar>
-              ))}
-            </AvatarGroup>
-          </div>
         </div>
       }
     >
       <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-        {overviewCards.map((card) => {
+        {actualOverviewCards.map((card) => {
           const Icon = iconMap[card.icon];
 
           return (
@@ -208,7 +254,7 @@ export function DashboardOverview() {
 
                     <div className="mt-3 flex items-center gap-3">
                       <CardTitle className="text-4xl leading-none">
-                        {card.value}
+                        {issuesLoading ? "—" : card.value}
                       </CardTitle>
 
                       <Badge variant="secondary" className="translate-y-0.5">
@@ -244,15 +290,15 @@ export function DashboardOverview() {
             <Card>
               <CardHeader>
                 <CardTitle>Issue by team</CardTitle>
-                <CardDescription>Current workload split across squads for the active sprint board.</CardDescription>
               </CardHeader>
               <CardContent>
+                {issuesLoading ? <div className="flex h-55 items-center justify-center text-sm text-muted-foreground">Loading issue data…</div> : !issuesByTeam.length ? <div className="flex h-55 items-center justify-center text-sm text-muted-foreground">No issues to display.</div> : (
                 <ChartContainer className="h-55 w-full" config={teamChartConfig}>
                   <BarChart accessibilityLayer data={issuesByTeam} margin={{ top: 12, right: 8, left: 8, bottom: 0 }}>
                     <CartesianGrid vertical={false} />
                     <XAxis tick={{ fill: "var(--foreground)", fillOpacity: 0.85 }} axisLine={false} dataKey="team" tickLine={false} tickMargin={10} />
                     <YAxis tick={{ fill: "var(--foreground)", fillOpacity: 0.85 }} allowDecimals={false} axisLine={false} tickLine={false} width={28} />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => [`${value} issues`, "Open load"]} hideLabel />} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => [`${value} issues`, "Issue count"]} hideLabel />} />
                     <Bar dataKey="total" radius={10}>
                       {issuesByTeam.map((entry) => (
                         <Cell key={entry.team} fill={entry.fill} />
@@ -260,17 +306,17 @@ export function DashboardOverview() {
                     </Bar>
                   </BarChart>
                 </ChartContainer>
+                )}
               </CardContent>
               <CardFooter className="justify-between gap-3 text-sm text-muted-foreground">
-                <span>{busiestTeam.team} has the heaviest queue right now.</span>
-                <Badge variant="secondary">{busiestTeam.total} issues</Badge>
+                <span>{issuesLoading ? "Loading current workload…" : busiestTeam ? `${busiestTeam.team} has the most assigned issues.` : "No assigned issues yet."}</span>
+                {busiestTeam ? <Badge variant="secondary">{busiestTeam.total} issues</Badge> : null}
               </CardFooter>
             </Card>
 
             <Card>
               <CardHeader>
                 <CardTitle>Priority breakdown</CardTitle>
-                <CardDescription>Donut view to spot how much of the board needs urgent attention.</CardDescription>
               </CardHeader>
               <CardContent>
                 <ChartContainer className="mx-auto h-55 w-full max-w-60" config={priorityChartConfig}>
@@ -322,10 +368,10 @@ export function DashboardOverview() {
             <Card>
               <CardHeader>
                 <CardTitle>Issue by status</CardTitle>
-                <CardDescription>Snapshot of how the board is distributed from backlog to done.</CardDescription>
               </CardHeader>
               <CardContent>
-                <ChartContainer className="h-55 w-full" config={statusChartConfig}>
+                {issuesLoading ? <div className="flex h-55 items-center justify-center text-sm text-muted-foreground">Loading issue data…</div> : !issuesByStatus.length ? <div className="flex h-55 items-center justify-center text-sm text-muted-foreground">No issues to display.</div> : (
+                <ChartContainer className="h-55 w-full" config={actualStatusChartConfig}>
                   <BarChart accessibilityLayer data={issuesByStatus} layout="vertical" margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                     <CartesianGrid horizontal={false} />
                     <XAxis allowDecimals={false} axisLine={false} tickLine={false} type="number" hide />
@@ -338,19 +384,46 @@ export function DashboardOverview() {
                     </Bar>
                   </BarChart>
                 </ChartContainer>
+                )}
               </CardContent>
               <CardFooter className="justify-between gap-3 text-sm text-muted-foreground">
-                <span>{busiestStatus.status} currently holds the most items.</span>
-                <Badge variant="secondary">{busiestStatus.total} issues</Badge>
+                <span>{issuesLoading ? "Loading current status counts…" : busiestStatus ? `${busiestStatus.status} currently holds the most issues.` : "No issues yet."}</span>
+                {busiestStatus ? <Badge variant="secondary">{busiestStatus.total} issues</Badge> : null}
               </CardFooter>
             </Card>
           </div>
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Kanban by status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {kanbanLoading ? (
+                  <div className="flex h-55 items-center justify-center text-sm text-muted-foreground">Loading Kanban data…</div>
+                ) : kanbanByStatus.length ? (
+                  <ChartContainer className="h-55 w-full" config={kanbanChartConfig}>
+                    <LineChart accessibilityLayer data={kanbanByStatus} margin={{ top: 12, right: 12, left: 4, bottom: 0 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="status" tick={{ fill: "var(--foreground)", fillOpacity: 0.85 }} axisLine={false} tickLine={false} tickMargin={10} />
+                      <YAxis allowDecimals={false} tick={{ fill: "var(--foreground)", fillOpacity: 0.85 }} axisLine={false} tickLine={false} width={28} />
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => [`${value} cards`, "Kanban"]} hideLabel />} />
+                      <Line dataKey="cards" type="monotone" stroke="var(--color-cards)" strokeWidth={3} dot={{ fill: "var(--color-cards)", r: 4 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ChartContainer>
+                ) : (
+                  <div className="flex h-55 items-center justify-center text-sm text-muted-foreground">No Kanban cards to display.</div>
+                )}
+              </CardContent>
+              <CardFooter className="justify-between gap-3 text-sm text-muted-foreground">
+                <span>Live snapshot from the Kanban board.</span>
+                <Badge variant="secondary">{kanbanCards.length} cards</Badge>
+              </CardFooter>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Issue watchlist</CardTitle>
-                <CardDescription>Focus list for urgent items only, without medium and low noise.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Table>
@@ -364,24 +437,30 @@ export function DashboardOverview() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {!issuesLoading && paginatedWatchlist.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                          No urgent issues to display.
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
                     {paginatedWatchlist.map((issue) => (
                       <TableRow key={issue.id}>
                         <TableCell>
-                          <div className="space-y-1">
-                            <p className="font-medium">{issue.id}</p>
-                            <p className="max-w-xl text-sm text-muted-foreground">{issue.title}</p>
-                          </div>
+                          <p className="font-medium">{issue.id}</p>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={priorityVariant(issue.priority)}>{issue.priority}</Badge>
+                          <Badge variant={priorityVariant(issue.criticality === "Tier 1 - Critical" ? "Critical" : "High")}>
+                            {issue.criticality === "Tier 1 - Critical" ? "Critical" : "High"}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant={statusVariant(issue.status)}>{issue.status}</Badge>
                         </TableCell>
-                        <TableCell>{issue.team}</TableCell>
+                        <TableCell>{issue.team || "Unassigned"}</TableCell>
                         <TableCell>
                           <Avatar size="sm">
-                            <AvatarFallback>{issue.assignee}</AvatarFallback>
+                            <AvatarFallback>{issue.pic?.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "—"}</AvatarFallback>
                           </Avatar>
                         </TableCell>
                       </TableRow>
@@ -389,7 +468,9 @@ export function DashboardOverview() {
                   </TableBody>
                 </Table>
 
-                {watchlistPageCount > 1 ? (
+                {issuesLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading issue watchlist…</p>
+                ) : watchlistPageCount > 1 ? (
                   <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-muted-foreground">
                       Showing {watchlistStartIndex + 1}-{Math.min(watchlistStartIndex + WATCHLIST_PAGE_SIZE, urgentWatchlist.length)} of {urgentWatchlist.length} urgent issues
@@ -405,29 +486,6 @@ export function DashboardOverview() {
               </CardContent>
             </Card>
 
-            <Card className="self-start pb-0">
-              <CardHeader>
-                <CardTitle>Triage notes</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-xl border bg-muted/30 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-medium">Crash cluster spike</p>
-                    <Badge variant="destructive">Critical</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">Android attachment uploads increased error volume by 38% after the latest rollout.</p>
-                </div>
-                <Separator />
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Quick handoff</p>
-                  <Textarea defaultValue="Need reproduction steps from QA and API logs from the upload gateway before the daily sync." rows={6} />
-                </div>
-              </CardContent>
-              <CardFooter className="justify-between">
-                <span className="text-xs text-muted-foreground">Last synced 8 minutes ago</span>
-                <Button variant="outline">Share update</Button>
-              </CardFooter>
-            </Card>
           </div>
         </TabsContent>
 

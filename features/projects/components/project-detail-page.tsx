@@ -11,7 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { PriorityBadge } from "@/features/projects/components/priority-badge";
 import { ProjectGantt, type TimelinePhase } from "@/features/projects/components/project-gantt";
+import { appToast } from "@/lib/app-toast";
 import { formatDate } from "@/lib/date";
+import { requestJson } from "@/lib/request";
 import type { ProjectDetail } from "@/types";
 
 type State = { status: "loading" } | { status: "notFound" } | { status: "error" } | { status: "ready"; project: ProjectDetail };
@@ -27,6 +29,7 @@ function BackButton() {
 // `id` adalah NewId (GUID) project.
 export function ProjectDetailPage({ id }: { id: string }) {
   const [state, setState] = useState<State>({ status: "loading" });
+  const [savingPhaseId, setSavingPhaseId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +61,47 @@ export function ProjectDetailPage({ id }: { id: string }) {
       })),
     [project]
   );
+
+  async function movePhase(phaseId: string, start: string, end: string) {
+    if (!project || savingPhaseId) return;
+    const phase = project.Phases.find((item) => String(item.Id) === phaseId);
+    if (!phase) return;
+
+    setSavingPhaseId(phaseId);
+    setState({
+      status: "ready",
+      project: {
+        ...project,
+        Phases: project.Phases.map((item) =>
+          String(item.Id) === phaseId ? { ...item, StartDate: start, EndDate: end } : item
+        ),
+      },
+    });
+
+    try {
+      await requestJson(`/api/projects/${encodeURIComponent(id)}/phases/${phaseId}`, "PATCH", { start, end });
+    } catch (error) {
+      setState((current) =>
+        current.status === "ready"
+          ? {
+              status: "ready",
+              project: {
+                ...current.project,
+                Phases: current.project.Phases.map((item) =>
+                  String(item.Id) === phaseId ? { ...item, StartDate: phase.StartDate, EndDate: phase.EndDate } : item
+                ),
+              },
+            }
+          : current
+      );
+      appToast.error({
+        title: "Failed to move phase",
+        description: error instanceof Error ? error.message : "The timeline dates could not be saved.",
+      });
+    } finally {
+      setSavingPhaseId(null);
+    }
+  }
 
   if (state.status === "loading") {
     return (
@@ -190,10 +234,15 @@ export function ProjectDetailPage({ id }: { id: string }) {
         <Card>
           <CardHeader>
             <CardTitle>Timeline</CardTitle>
-            <CardDescription>Phases of this project on the Gantt chart.</CardDescription>
+            <CardDescription>Drag a phase bar to move its dates. The timeline adjusts automatically.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ProjectGantt phases={phases} emptyMessage="This project has no timeline phases." />
+            <ProjectGantt
+              phases={phases}
+              onPhaseMove={movePhase}
+              savingPhaseId={savingPhaseId}
+              emptyMessage="This project has no timeline phases."
+            />
           </CardContent>
         </Card>
 
