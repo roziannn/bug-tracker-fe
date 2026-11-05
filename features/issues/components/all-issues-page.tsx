@@ -2,7 +2,7 @@
 
   import Link from "next/link";
   import { useEffect, useMemo, useState } from "react";
-  import { Download, Eye, ListFilter, Pencil, Plus, Search, ShieldAlert, TimerReset, TriangleAlert } from "lucide-react";
+  import { ArrowDown, ArrowUp, Download, Equal, Eye, ListFilter, Pencil, Plus, Search, ShieldAlert, TimerReset, TriangleAlert } from "lucide-react";
 
   import { AppShell } from "@/components/layout/app-shell";
   import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,22 @@
   import { requestJson } from "@/lib/request";
 
   const PAGE_SIZE = 10;
+
+  function statusBadgeClass(status: IssueStatus) {
+    if (status === "Done") return "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
+    if (status === "In review") return "border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-400";
+    if (status === "Investigating") return "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400";
+    if (status === "Ready") return "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400";
+    if (status === "Backlog") return "border-slate-500/20 bg-slate-500/10 text-slate-700 dark:text-slate-300";
+    return "border-border bg-muted text-muted-foreground";
+  }
+
+  function PriorityIcon({ priority }: { priority: Priority }) {
+    if (priority === "Critical") return <TriangleAlert aria-hidden="true" />;
+    if (priority === "High") return <ArrowUp aria-hidden="true" />;
+    if (priority === "Medium") return <Equal aria-hidden="true" />;
+    return <ArrowDown aria-hidden="true" />;
+  }
 
   type LabelFilter = string | "None" | "all";
   type StatusFilter = IssueStatus | "all";
@@ -336,8 +352,8 @@
                     paginatedIssues.map((issue) => (
                       <TableRow key={issue.id}>
                         <TableCell className="font-medium whitespace-normal break-words">{issue.id}</TableCell>
-                        <TableCell className="whitespace-normal break-words">
-                          <p className="font-medium">{issue.title}</p>
+                        <TableCell className="min-w-0">
+                          <p className="truncate font-medium" title={issue.title}>{issue.title}</p>
                         </TableCell>
                         <TableCell className="whitespace-normal">
                           <Badge variant="outline">{issue.label}</Badge>
@@ -346,17 +362,20 @@
                           {issue.team}
                         </TableCell>
                         <TableCell className="whitespace-normal">
-                          <Badge variant={statusVariant(issue.status)}>{issue.status}</Badge>
+                          <Badge variant={statusVariant(issue.status)} className={statusBadgeClass(issue.status)}>{issue.status}</Badge>
                         </TableCell>
                         <TableCell className="whitespace-normal">
-                          <Badge variant={priorityVariant(issue.priority)}>{issue.priority}</Badge>
+                          <Badge variant={priorityVariant(issue.priority)}>
+                            <PriorityIcon priority={issue.priority} />
+                            {issue.priority}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground whitespace-normal">
                           {formatDate(issue.createdAt)}
                         </TableCell>
                         <TableCell className="whitespace-normal">
                           <div className="flex gap-2">
-                            <Button nativeButton={false} render={<Link href={`/issues/${issue.detailId ?? issue.id}`} />} size="sm" variant="outline"><Eye />Show</Button>
+                            <Button nativeButton={false} render={<Link href={`/issues/${issue.detailId ?? issue.id}`} />} size="sm" variant="outline"><Eye /></Button>
                             <Button nativeButton={false} render={<Link href={`/issues/${issue.detailId ?? issue.id}/edit`} />} size="icon-sm" variant="outline" aria-label={`Edit ${issue.id}`}><Pencil /></Button>
                           </div>
                         </TableCell>
