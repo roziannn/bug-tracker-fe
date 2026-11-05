@@ -3,6 +3,7 @@ import { loginSchema } from "@/lib/validation";
 import { getUserForAuth } from "@/repositories/user.repository";
 import { verifyPassword } from "@/lib/password";
 import { createSessionCookie } from "@/lib/auth";
+import { addAuditTrailEvent } from "@/repositories/audit-trail.repository";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,6 +11,15 @@ export async function POST(req: NextRequest) {
     const parsed = loginSchema.safeParse(body);
 
     if (!parsed.success) {
+      const attemptedUser = typeof body?.email === "string" ? body.email.trim() : "Unknown user";
+      await addAuditTrailEvent({
+        actor: attemptedUser || "Unknown user",
+        action: "Login failed",
+        targetType: "Authentication",
+        targetName: attemptedUser || "Unknown user",
+        detail: "Invalid login request",
+        outcome: "Blocked",
+      });
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
@@ -17,13 +27,22 @@ export async function POST(req: NextRequest) {
     const genericError = NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
 
     const user = await getUserForAuth(email);
-    if (!user) return genericError;
+    if (!user) {
+      await addAuditTrailEvent({ actor: email, action: "Login failed", targetType: "Authentication", targetName: email, detail: "Invalid credentials", outcome: "Blocked" });
+      return genericError;
+    }
     if (!user.IsActive) {
+      await addAuditTrailEvent({ actor: user.Email, action: "Login failed", targetType: "Authentication", targetName: user.Name, detail: "Inactive account", outcome: "Blocked" });
       return NextResponse.json({ error: "Your account is inactive, please contact an administrator" }, { status: 403 });
     }
 
     const valid = await verifyPassword(password, user.Password);
-    if (!valid) return genericError;
+    if (!valid) {
+      await addAuditTrailEvent({ actor: user.Email, action: "Login failed", targetType: "Authentication", targetName: user.Name, detail: "Invalid credentials", outcome: "Blocked" });
+      return genericError;
+    }
+
+    await addAuditTrailEvent({ actor: user.Email, action: "Login", targetType: "Authentication", targetName: user.Name, detail: "User signed in" });
 
     await createSessionCookie({
       userId: user.Id,

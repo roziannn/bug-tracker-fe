@@ -214,3 +214,21 @@ export async function updateProject(newId: string, input: CreateProjectInput, up
     return newId;
   });
 }
+
+export async function updateProjectPhaseDates(
+  projectNewId: string,
+  phaseId: number,
+  start: string,
+  end: string,
+  updatedBy: string | null
+): Promise<boolean> {
+  const rows = await query<{ Id: number }>(
+    `UPDATE "DATA_ProjectPhases" phase
+     SET "StartDate" = $3, "EndDate" = $4, "UpdatedBy" = $5, "UpdatedDate" = now()
+     FROM "DATA_Projects" project
+     WHERE project."NewId" = $1 AND phase."ProjectId" = project."Id" AND phase."Id" = $2
+     RETURNING phase."Id" AS "Id"`,
+    [projectNewId, phaseId, start, end, updatedBy]
+  );
+  return rows.length > 0;
+}

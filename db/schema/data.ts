@@ -1,5 +1,5 @@
 // Tabel transaksi / flow: prefix DATA_
-import { date, integer, jsonb, pgTable, text, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { date, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { auditColumns } from "./_columns";
 import { coreCategory, coreUser } from "./core";
 
@@ -117,4 +117,16 @@ export const dataKanban = pgTable("DATA_Kanban", {
   Sequence: integer("Sequence").notNull().default(0),
   Payload: jsonb("Payload").$type<Record<string, unknown>>().notNull().default({}),
   ...auditColumns,
+});
+
+// Unified event log populated by database triggers for application table mutations.
+export const dataAuditTrail = pgTable("DATA_AuditTrail", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  Actor: varchar("Actor", { length: 255 }).notNull().default("System"),
+  Action: varchar("Action", { length: 100 }).notNull(),
+  TargetType: varchar("TargetType", { length: 100 }).notNull(),
+  TargetName: varchar("TargetName", { length: 255 }).notNull(),
+  Detail: text("Detail").notNull().default(""),
+  Outcome: varchar("Outcome", { length: 20 }).notNull().default("Success"),
+  CreatedDate: timestamp("CreatedDate", { mode: "string" }).notNull().defaultNow(),
 });

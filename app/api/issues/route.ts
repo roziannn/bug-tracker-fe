@@ -11,17 +11,34 @@ export async function GET() {
   try {
     const issues = await query<{
       id: string; newId: string; title: string; status: string; criticality: string;
-      classification: string | null; pic: string | null; project: string | null;
-      description: string; createdAt: string;
+      classification: string | null; pic: string | null; project: string | null; team: string | null;
+      description: string; createdAt: string; resolvedAt: string | null;
     }>(
       `SELECT 'BUG-' || lpad(i."Id"::text, 3, '0') AS "id", i."NewId" AS "newId",
         i."Title" AS "title", i."Status" AS "status", i."Criticality" AS "criticality",
         c."Name" AS "classification", u."Name" AS "pic", p."Name" AS "project",
-        i."Description" AS "description", i."CreatedDate" AS "createdAt"
+        issue_team."Name" AS "team",
+        i."Description" AS "description", i."CreatedDate" AS "createdAt", closed_activity."CreatedDate" AS "resolvedAt"
        FROM "DATA_Issues" i
        LEFT JOIN "CORE_Category" c ON c."Id" = i."ClassificationId"
        LEFT JOIN "CORE_User" u ON u."Id" = i."PICId"
        LEFT JOIN "DATA_Projects" p ON p."Id" = i."ProjectId"
+       LEFT JOIN LATERAL (
+         SELECT domain."Name"
+         FROM "CORE_TeamMember" member
+         JOIN "CORE_Team" team ON team."Id" = member."TeamId" AND team."IsActive" = true
+         JOIN "CORE_Category" domain ON domain."Id" = team."DomainId"
+         WHERE member."UserId" = i."PICId" AND member."IsActive" = true
+         ORDER BY member."Id"
+         LIMIT 1
+       ) issue_team ON true
+       LEFT JOIN LATERAL (
+         SELECT activity."CreatedDate"
+         FROM "DATA_IssueActivity" activity
+         WHERE activity."IssueId" = i."Id" AND activity."Action" = 'Issue closed'
+         ORDER BY activity."CreatedDate" DESC
+         LIMIT 1
+       ) closed_activity ON true
        WHERE i."IsActive" = true
        ORDER BY i."CreatedDate" DESC, i."Id" DESC`
     );

@@ -28,6 +28,7 @@ import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-se
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { formatDate, formatDateTime as formatDateTimeStamp } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { requestJson } from "@/lib/request";
@@ -42,6 +43,7 @@ import type { Project } from "@/types";
 
 const COLUMNS_STORAGE_KEY = "bug-tracker:kanban-columns";
 const CURRENT_AUTHOR = "You";
+const KANBAN_PAGE_SIZE = 5;
 type PersistedKanbanCard = IssueRecord & { sequence: number };
 
 function newId(prefix: string) {
@@ -211,6 +213,10 @@ function KanbanColumnView({
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(issues.length / KANBAN_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const visibleIssues = issues.slice((currentPage - 1) * KANBAN_PAGE_SIZE, currentPage * KANBAN_PAGE_SIZE);
 
   // Kalau kartu yang diseret dilepas tepat di bawah dirinya sendiri atau di bawah tetangganya, urutan tidak berubah: garis disembunyikan.
   const draggedIndex = draggingId ? issues.findIndex((issue) => issue.id === draggingId) : -1;
@@ -263,7 +269,7 @@ function KanbanColumnView({
       <CardContent className="flex flex-1 rounded-lg flex-col gap-3 p-3">
         {issues.length ? (
           <>
-            {issues.map((issue) => (
+            {visibleIssues.map((issue) => (
               <Fragment key={issue.id}>
                 {showIndicator && overBeforeId === issue.id ? <DropIndicator /> : null}
                 <IssueCard
@@ -282,6 +288,12 @@ function KanbanColumnView({
             Drop bug cards here.
           </div>
         )}
+
+        {issues.length > KANBAN_PAGE_SIZE ? (
+          <div className="border-t pt-3">
+            <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
+          </div>
+        ) : null}
 
         {isAdding ? (
           <div className="space-y-2">

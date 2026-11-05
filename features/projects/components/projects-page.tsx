@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BriefcaseBusiness, CalendarClock, Download, Eye, Flag, Pencil, Plus, Search, UserRound } from "lucide-react";
+import { BriefcaseBusiness, CalendarClock, Download, Edit, Eye, Flag, Pencil, Plus, Search, UserRound } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -76,8 +76,7 @@ export function ProjectsPage() {
   // null = masih dimuat
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -95,17 +94,11 @@ export function ProjectsPage() {
 
   const loaded = projects !== null;
   const allProjects = useMemo(() => projects ?? [], [projects]);
-  const ownerOptions = useMemo(() => Array.from(new Set(allProjects.map((project) => project.OwnerName))).sort(), [allProjects]);
-  // Hari ini hanya dipakai setelah data termuat (di browser), jadi tidak ada beda hasil render server dan browser.
+    // Hari ini hanya dipakai setelah data termuat (di browser), jadi tidak ada beda hasil render server dan browser.
   const today = useMemo(() => (projects === null ? null : todayDateOnly()), [projects]);
   const statuses = useMemo(
     () => new Map(allProjects.map((project) => [project.NewId, today === null ? null : getCurrentStatus(project.Phases, today)] as const)),
     [allProjects, today]
-  );
-  const statusOptions = useMemo(
-    () =>
-      Array.from(new Set(Array.from(statuses.values()).flatMap((status) => (status ? statusLabels(status) : [])))).sort(),
-    [statuses]
   );
 
   // Angka ringkasan dihitung dari database.
@@ -133,26 +126,34 @@ export function ProjectsPage() {
     { label: "Project owners", note: "People who own a project.", icon: UserRound, value: stats?.owners },
   ];
 
-  const filteredProjects = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
+const priorityOptions = useMemo(
+  () => Array.from(new Set(allProjects.map((project) => project.Priority))).sort(),
+  [allProjects]
+);
 
-    return allProjects.filter((project) => {
-      const ownerMatch = ownerFilter === "all" || project.OwnerName === ownerFilter;
-      const status = statuses.get(project.NewId);
-      const labels = status ? statusLabels(status) : [];
-      const statusMatch = statusFilter === "all" || labels.includes(statusFilter);
-      const searchMatch =
-        !normalizedQuery ||
-        project.Name.toLowerCase().includes(normalizedQuery) ||
-        project.Description.toLowerCase().includes(normalizedQuery) ||
-        project.OwnerName.toLowerCase().includes(normalizedQuery) ||
-        labels.some((label) => label.toLowerCase().includes(normalizedQuery));
+const filteredProjects = useMemo(() => {
+  const normalizedQuery = searchQuery.trim().toLowerCase();
 
-      return ownerMatch && statusMatch && searchMatch;
-    });
-  }, [allProjects, ownerFilter, searchQuery, statusFilter, statuses]);
+  return allProjects.filter((project) => {
+    const priorityMatch =
+      priorityFilter === "all" || project.Priority === priorityFilter;
 
-  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
+    const status = statuses.get(project.NewId);
+    const labels = status ? statusLabels(status) : [];
+
+    const searchMatch =
+      !normalizedQuery ||
+      project.Name.toLowerCase().includes(normalizedQuery) ||
+      project.Description.toLowerCase().includes(normalizedQuery) ||
+      project.OwnerName.toLowerCase().includes(normalizedQuery) ||
+      labels.some((label) => label.toLowerCase().includes(normalizedQuery));
+
+    return priorityMatch && searchMatch;
+  });
+}, [allProjects, priorityFilter, searchQuery, statuses]);
+
+
+const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginatedProjects = useMemo(
     () => filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
@@ -238,38 +239,23 @@ export function ProjectsPage() {
               </div>
               <Select
                 onValueChange={(value) => {
-                  setOwnerFilter(value ?? "all");
+                  setPriorityFilter(value ?? "all");
                   setPage(1);
                 }}
-                value={ownerFilter}
+                value={priorityFilter}
               >
-                <SelectTrigger className="h-9 w-auto min-w-[88px] px-2.5" aria-label="Filter by owner">
-                  <SelectValue placeholder="Owner" />
+                <SelectTrigger
+                  className="h-9 w-auto min-w-[120px] px-2.5"
+                  aria-label="Filter by priority"
+                >
+                  <SelectValue placeholder="Priority" />
                 </SelectTrigger>
+
                 <SelectContent>
-                  <SelectItem value="all">all owners</SelectItem>
-                  {ownerOptions.map((owner) => (
-                    <SelectItem key={owner} value={owner}>
-                      {owner}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                onValueChange={(value) => {
-                  setStatusFilter(value ?? "all");
-                  setPage(1);
-                }}
-                value={statusFilter}
-              >
-                <SelectTrigger className="h-9 w-auto min-w-[88px] px-2.5" aria-label="Filter by current status">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">all statuses</SelectItem>
-                  {statusOptions.map((label) => (
-                    <SelectItem key={label} value={label}>
-                      {label}
+                  <SelectItem value="all">All priorities</SelectItem>
+                  {priorityOptions.map((priority) => (
+                    <SelectItem key={priority} value={priority}>
+                      {priority}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -320,7 +306,7 @@ export function ProjectsPage() {
                               aria-label={`Edit ${project.Name}`}
                               title="Edit"
                             >
-                              <Pencil />
+                              <Edit />
                             </Button>
                           </div>
                         </TableCell>
