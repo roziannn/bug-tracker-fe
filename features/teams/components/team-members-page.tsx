@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Pencil, Save, UserPlus } from "lucide-react";
+import { ArrowLeft, Save, UserPlus } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import type { Paged, Team, TeamMember, User } from "@/types";
 
 const PAGE_SIZE = 10;
-const COLUMNS = 8;
+const COLUMNS = 7;
 
 // id = Id anggota yang sedang diedit, null kalau menambah baru.
 type Draft = { id: number | null; name: string; userId: string | null; accessLevel: AccessLevel };
@@ -214,7 +214,6 @@ export function TeamMembersPage({ id }: { id: string }) {
                   <TableHead>Created by</TableHead>
                   <TableHead>Created date</TableHead>
                   <TableHead>Active</TableHead>
-                  <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -248,23 +247,6 @@ export function TeamMembersPage({ id }: { id: string }) {
                               )}
                             />
                           </button>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            onClick={() =>
-                              setDraft({
-                                id: member.Id,
-                                name: member.Name,
-                                userId: String(member.UserId),
-                                accessLevel: (ACCESS_LEVELS.find((item) => item === member.AccessLevel) ?? DEFAULT_ACCESS_LEVEL) as AccessLevel,
-                              })
-                            }
-                            variant="outline"
-                            size="icon-sm"
-                            aria-label={`Edit ${member.Name}`}
-                          >
-                            <Pencil />
-                          </Button>
                         </TableCell>
                       </TableRow>
                     ))

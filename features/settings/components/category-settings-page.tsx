@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { getCategoryConfig } from "@/features/settings/data/category-store";
 import { appToast } from "@/lib/app-toast";
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils";
 import type { Category } from "@/types";
 
 const COLUMNS = 6;
+const PAGE_SIZE = 10;
 
 type Draft = { id: number | null; name: string; description: string };
 
@@ -44,11 +46,15 @@ export function CategorySettingsPage({ slug }: { slug: string }) {
   const [items, setItems] = useState<Category[]>([]);
   // Slug yang datanya sudah termuat. Berbeda dari slug sekarang berarti sedang pindah kategori: tampilkan skeleton.
   const [loadedSlug, setLoadedSlug] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [toDelete, setToDelete] = useState<Category | null>(null);
   const showSkeleton = loadedSlug !== slug;
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = items.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const loadItems = useCallback(async () => {
     try {
@@ -58,6 +64,10 @@ export function CategorySettingsPage({ slug }: { slug: string }) {
     } finally {
       setLoadedSlug(slug);
     }
+  }, [slug]);
+
+  useEffect(() => {
+    setPage(1);
   }, [slug]);
 
   useEffect(() => {
@@ -152,7 +162,7 @@ export function CategorySettingsPage({ slug }: { slug: string }) {
             </TableHeader>
             <TableBody>
               {showSkeleton ? <TableSkeletonRows rows={5} columns={COLUMNS} /> : null}
-              {(showSkeleton ? [] : items).map((item) => (
+              {(showSkeleton ? [] : pageItems).map((item) => (
                 <TableRow key={item.Id} className={cn(!item.IsActive && "opacity-60")}>
                   <TableCell className="font-medium">
                     {item.Name}
@@ -218,6 +228,13 @@ export function CategorySettingsPage({ slug }: { slug: string }) {
               ) : null}
             </TableBody>
           </Table>
+          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Showing {items.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}-
+              {Math.min((currentPage - 1) * PAGE_SIZE + pageItems.length, items.length)} of {items.length} {config.title.toLowerCase()}
+            </p>
+            <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
+          </div>
         </CardContent>
       </Card>
 

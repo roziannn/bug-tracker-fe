@@ -41,6 +41,7 @@ export function UsersSettingsPage() {
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const totalPages = Math.max(1, Math.ceil((users?.total ?? 0) / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
   // Skeleton tampil saat pertama kali memuat dan saat pindah halaman, bukan saat mengetik di pencarian.
   const showSkeleton = !loadError && (users === null || users.page !== page);
 
@@ -190,8 +191,11 @@ export function UsersSettingsPage() {
           </Table>
 
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">{users?.total ?? 0} users</p>
-            <TablePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+            <p className="text-sm text-muted-foreground">
+              Showing {users?.data.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}-
+              {Math.min((currentPage - 1) * PAGE_SIZE + (users?.data.length ?? 0), users?.total ?? 0)} of {users?.total ?? 0} users
+            </p>
+            <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
           </div>
         </CardContent>
       </Card>

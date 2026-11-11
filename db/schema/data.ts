@@ -82,6 +82,7 @@ export const dataIssues = pgTable("DATA_Issues", {
   Title: varchar("Title", { length: 255 }).notNull().default(""),
   Description: text("Description").notNull().default(""),
   Solution: text("Solution").notNull().default(""),
+  RootCause: text("RootCause").notNull().default(""),
   Status: varchar("Status", { length: 30 }).notNull().default("Draft"),
   ClassificationId: integer("ClassificationId").references(() => coreCategory.Id, { onDelete: "set null" }),
   Criticality: varchar("Criticality", { length: 50 }).notNull().default("Tier 2 - Major"),

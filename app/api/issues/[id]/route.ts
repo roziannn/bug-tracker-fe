@@ -14,14 +14,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       id: string; newId: string; title: string; status: string; criticality: string;
       classification: string | null; classificationId: number | null; pic: string | null; picId: number | null; project: string | null; projectId: string | null;
       description: string; evidence: { name: string; size: number }[]; createdAt: string;
-      createdBy: string | null; solution: string;
+      createdBy: string | null; solution: string; rootCause: string;
     }>(
       `SELECT 'BUG-' || lpad(i."Id"::text, 3, '0') AS "id", i."NewId" AS "newId",
         i."Title" AS "title", i."Status" AS "status", i."Criticality" AS "criticality",
         c."Name" AS "classification", i."ClassificationId" AS "classificationId",
         u."Name" AS "pic", i."PICId" AS "picId", p."Name" AS "project", p."NewId" AS "projectId",
         i."Description" AS "description", i."Evidence" AS "evidence",
-        i."CreatedDate" AS "createdAt", i."CreatedBy" AS "createdBy", i."Solution" AS "solution"
+        i."CreatedDate" AS "createdAt", i."CreatedBy" AS "createdBy", i."Solution" AS "solution", i."RootCause" AS "rootCause"
        FROM "DATA_Issues" i
        LEFT JOIN "CORE_Category" c ON c."Id" = i."ClassificationId"
        LEFT JOIN "CORE_User" u ON u."Id" = i."PICId"
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const body = (await req.json().catch(() => null)) as { solution?: string; status?: string } | null;
+    const body = (await req.json().catch(() => null)) as { solution?: string; rootCause?: string; status?: string } | null;
     if (body?.status !== undefined) {
       if (body.status !== "Done" && body.status !== "Backlog") return fail("Status must be Done or Backlog", 400);
       const session = await getSession();
@@ -94,17 +94,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (updated[0]) await addIssueActivity(updated[0].Id, session?.name ?? "System", body.status === "Done" ? "Issue closed" : "Issue re-opened");
       return updated[0] ? ok(updated[0]) : fail("Issue not found", 404);
     }
-    if (typeof body?.solution !== "string") return fail("Solution is required", 400);
-    if (body.solution.length > 10000) return fail("Solution must be 10000 characters or fewer", 400);
+    const field = typeof body?.solution === "string" ? "Solution" : typeof body?.rootCause === "string" ? "RootCause" : null;
+    const content = field === "Solution" ? body?.solution : body?.rootCause;
+    if (!field || typeof content !== "string") return fail("Solution or root cause is required", 400);
+    if (content.length > 2 * 1024 * 1024) return fail("Content is too large", 400);
     const session = await getSession();
-    const rows = await query<{ Id: number; NewId: string; Solution: string }>(
-      `UPDATE "DATA_Issues" SET "Solution" = $2, "UpdatedBy" = $3, "UpdatedDate" = now()
+    const rows = await query<{ Id: number; NewId: string; Solution?: string; RootCause?: string }>(
+      `UPDATE "DATA_Issues" SET "${field}" = $2, "UpdatedBy" = $3, "UpdatedDate" = now()
        WHERE "IsActive" = true AND ("NewId"::text = $1 OR ('BUG-' || lpad("Id"::text, 3, '0')) = $1)
-       RETURNING "Id", "NewId", "Solution"`,
-      [id, body.solution.trim(), session?.email ?? "System"]
+       RETURNING "Id", "NewId", "${field}"`,
+      [id, content.trim(), session?.email ?? "System"]
     );
-    if (rows[0]) await addIssueActivity(rows[0].Id, session?.name ?? "System", "Solution updated", body.solution.trim() ? "Updated the issue solution." : "Cleared the issue solution.");
-    return rows[0] ? ok(rows[0]) : fail("Issue not found", 404);
+    if (rows[0]) {
+      const value = content.trim();
+      const label = field === "Solution" ? "solution" : "root cause";
+      await addIssueActivity(rows[0].Id, session?.name ?? "System", `${field === "Solution" ? "Solution" : "Root cause"} updated`, value ? `Updated the issue ${label}.` : `Cleared the issue ${label}.`);
+      return ok({ ...rows[0], [field]: value });
+    }
+    return fail("Issue not found", 404);
   } catch (err) {
     return handleError(err);
   }

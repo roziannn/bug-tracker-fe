@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { STANDARD_ENVIRONMENTS } from "@/features/settings/data/environments";
 import { appToast } from "@/lib/app-toast";
@@ -27,6 +28,7 @@ import type { EnvVar } from "@/types";
 
 const KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 const COLUMNS = 6;
+const PAGE_SIZE = 10;
 
 type Draft = {
   id: number | null;
@@ -56,6 +58,7 @@ export function EnvironmentSettingsPage() {
   const [loaded, setLoaded] = useState(false);
   const [extraEnvironments, setExtraEnvironments] = useState<string[]>([]);
   const [selectedEnv, setSelectedEnv] = useState(STANDARD_ENVIRONMENTS[0]);
+  const [page, setPage] = useState(1);
   const [revealed, setRevealed] = useState<Record<number, string>>({});
   const [revealingId, setRevealingId] = useState<number | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -75,6 +78,13 @@ export function EnvironmentSettingsPage() {
   }, [extraEnvironments, vars]);
 
   const selectedVars = vars.filter((item) => item.Environment.toLowerCase() === selectedEnv.toLowerCase());
+  const totalPages = Math.max(1, Math.ceil(selectedVars.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageVars = selectedVars.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedEnv]);
 
   const loadVars = useCallback(async () => {
     try {
@@ -259,7 +269,7 @@ export function EnvironmentSettingsPage() {
               <TableBody>
                 {!loaded ? <TableSkeletonRows rows={5} columns={COLUMNS} /> : null}
                 {loaded
-                  ? selectedVars.map((item) => {
+                  ? pageVars.map((item) => {
                       const shown = item.IsSecret ? revealed[item.Id] : (item.Value ?? "");
                       const hidden = item.IsSecret && shown === undefined;
 
@@ -317,6 +327,13 @@ export function EnvironmentSettingsPage() {
                 ) : null}
               </TableBody>
             </Table>
+            <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing {selectedVars.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}-
+                {Math.min((currentPage - 1) * PAGE_SIZE + pageVars.length, selectedVars.length)} of {selectedVars.length} variables
+              </p>
+              <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
+            </div>
           </CardContent>
         </Card>
       </div>

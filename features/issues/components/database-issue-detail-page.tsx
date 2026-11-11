@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Check, CheckCircle2, FileText, History, Lightbulb, MessageSquare, Pencil, Reply, RotateCcw, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, FileText, History, Lightbulb, MessageSquare, Pencil, Reply, RotateCcw, Target, Trash2, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor, sanitizeRichText } from "@/components/ui/rich-text-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CredentialConfirmDialog } from "@/components/shared/credential-confirm-dialog";
 import { appToast } from "@/lib/app-toast";
@@ -30,6 +30,7 @@ type IssueDetail = {
   createdAt: string;
   createdBy: string | null;
   solution: string;
+  rootCause: string;
   comments: { id: number; parentCommentId: number | null; author: string; body: string; createdAt: string }[];
   activity: { id: number; actor: string; action: string; detail: string; createdAt: string }[];
 };
@@ -135,6 +136,9 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [solution, setSolution] = useState("");
+  const [editingSolution, setEditingSolution] = useState(false);
+  const [rootCause, setRootCause] = useState("");
+  const [editingRootCause, setEditingRootCause] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
@@ -142,13 +146,14 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
   const [replyingCommentId, setReplyingCommentId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
   const [savingSolution, setSavingSolution] = useState(false);
+  const [savingRootCause, setSavingRootCause] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   useEffect(() => {
     requestJson<Paged<User>>("/api/users?pageSize=100").then((result) => setUsers(result.data.filter((user) => user.IsActive))).catch(() => setUsers([]));
     requestJson<IssueDetail>(`/api/issues/${encodeURIComponent(id)}`)
-      .then((data) => { setIssue(data); setSolution(data.solution); })
+      .then((data) => { setIssue(data); setSolution(data.solution); setRootCause(data.rootCause ?? ""); })
       .catch((err) => {
         const message = err instanceof Error ? err.message : "Something went wrong, please try again.";
         setLoadError(message);
@@ -217,13 +222,30 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
     if (savingSolution) return;
     setSavingSolution(true);
     try {
-      const result = await requestJson<{ Solution: string }>(`/api/issues/${encodeURIComponent(id)}`, "PATCH", { solution });
+      const richSolution = sanitizeRichText(solution);
+      const result = await requestJson<{ Solution: string }>(`/api/issues/${encodeURIComponent(id)}`, "PATCH", { solution: richSolution });
       setSolution(result.Solution);
       setIssue((current) => current ? { ...current, solution: result.Solution } : current);
+      setEditingSolution(false);
       appToast.success({ title: "Solution saved" });
     } catch (err) {
       appToast.error({ title: "Failed to save solution", description: err instanceof Error ? err.message : undefined });
     } finally { setSavingSolution(false); }
+  }
+
+  async function saveRootCause() {
+    if (savingRootCause) return;
+    setSavingRootCause(true);
+    try {
+      const richRootCause = sanitizeRichText(rootCause);
+      const result = await requestJson<{ RootCause: string }>(`/api/issues/${encodeURIComponent(id)}`, "PATCH", { rootCause: richRootCause });
+      setRootCause(result.RootCause);
+      setIssue((current) => current ? { ...current, rootCause: result.RootCause } : current);
+      setEditingRootCause(false);
+      appToast.success({ title: "Root cause saved" });
+    } catch (err) {
+      appToast.error({ title: "Failed to save root cause", description: err instanceof Error ? err.message : undefined });
+    } finally { setSavingRootCause(false); }
   }
 
   async function toggleClosed() {
@@ -279,6 +301,7 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
               <TabsList variant="line" className="h-11 w-full justify-start gap-6 rounded-none border-0 bg-transparent p-0">
                 <TabsTrigger value="discussion" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><MessageSquare />Discussion<span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px]">{issue.comments.length}</span></TabsTrigger>
                 <TabsTrigger value="solution" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><Lightbulb />Solution</TabsTrigger>
+                <TabsTrigger value="root-cause" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><Target />Root Cause</TabsTrigger>
                 <TabsTrigger value="activity" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><History />Activity</TabsTrigger>
               </TabsList>
             </CardHeader>
@@ -290,11 +313,74 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
                 </div>
                 {issue.comments.filter((comment) => !comment.parentCommentId).length ? <div className="space-y-3">{issue.comments.filter((comment) => !comment.parentCommentId).map((comment) => <article key={comment.id} className="rounded-xl border px-4 py-3"><div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold">{comment.author}</p><div className="flex items-center gap-2"><time className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</time>{editingCommentId !== comment.id ? <><Button type="button" size="icon-sm" variant="ghost" aria-label="Reply to comment" title="Reply" disabled={busyCommentId !== null} onClick={() => { setReplyingCommentId(replyingCommentId === comment.id ? null : comment.id); setReplyText(""); }}><Reply /></Button><Button type="button" size="icon-sm" variant="ghost" aria-label="Edit comment" title="Edit comment" disabled={busyCommentId !== null} onClick={() => { setEditingCommentId(comment.id); setEditingCommentText(comment.body); }}><Pencil /></Button><Button type="button" size="icon-sm" variant="ghost" aria-label="Delete comment" title="Delete comment" disabled={busyCommentId !== null} onClick={() => deleteComment(comment.id)}><Trash2 className="text-destructive" /></Button></> : null}</div></div>{editingCommentId === comment.id ? <div className="space-y-2"><MentionTextarea autoFocus className="min-h-20 resize-y" value={editingCommentText} onChange={setEditingCommentText} users={users} /> <div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" disabled={busyCommentId === comment.id} onClick={() => { setEditingCommentId(null); setEditingCommentText(""); }}><X />Cancel</Button><Button type="button" size="sm" disabled={!editingCommentText.trim() || busyCommentId === comment.id} onClick={() => saveCommentEdit(comment.id)}>{busyCommentId === comment.id ? "Saving..." : <><Check />Save</>}</Button></div></div> : <p className="whitespace-pre-wrap text-sm leading-6"><MentionText text={comment.body} users={users} /></p>}{issue.comments.filter((reply) => reply.parentCommentId === comment.id).map((reply) => <div key={reply.id} className="ml-5 mt-3 rounded-lg border-l-2 bg-muted/30 px-3 py-2"><div className="mb-1 flex items-center justify-between gap-3"><p className="text-sm font-semibold">{reply.author}</p><div className="flex items-center gap-2"><time className="text-xs text-muted-foreground">{formatDate(reply.createdAt)}</time><Button type="button" size="icon-sm" variant="ghost" aria-label="Edit reply" title="Edit reply" disabled={busyCommentId !== null} onClick={() => { setEditingCommentId(reply.id); setEditingCommentText(reply.body); }}><Pencil /></Button><Button type="button" size="icon-sm" variant="ghost" aria-label="Delete reply" title="Delete reply" disabled={busyCommentId !== null} onClick={() => deleteComment(reply.id)}><Trash2 className="text-destructive" /></Button></div></div>{editingCommentId === reply.id ? <div className="space-y-2"><MentionTextarea autoFocus className="min-h-20 resize-y" value={editingCommentText} onChange={setEditingCommentText} users={users} /><div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" disabled={busyCommentId === reply.id} onClick={() => { setEditingCommentId(null); setEditingCommentText(""); }}><X />Cancel</Button><Button type="button" size="sm" disabled={!editingCommentText.trim() || busyCommentId === reply.id} onClick={() => saveCommentEdit(reply.id)}>{busyCommentId === reply.id ? "Saving..." : <><Check />Save</>}</Button></div></div> : <p className="whitespace-pre-wrap text-sm leading-6"><MentionText text={reply.body} users={users} /></p>}</div>)}{replyingCommentId === comment.id ? <div className="ml-5 mt-3 space-y-2 border-l-2 pl-3"><MentionTextarea autoFocus className="min-h-20 resize-y" value={replyText} onChange={setReplyText} users={users} placeholder={`Reply to ${comment.author}...`} /><div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" disabled={postingComment} onClick={() => { setReplyingCommentId(null); setReplyText(""); }}>Cancel</Button><Button type="button" size="sm" disabled={!replyText.trim() || postingComment} onClick={() => postReply(comment.id)}>{postingComment ? "Posting..." : <><Reply />Post reply</>}</Button></div></div> : null}</article>)}</div> : <div className="rounded-xl border border-dashed px-4 py-8 text-center"><MessageSquare className="mx-auto mb-2 size-5 text-muted-foreground" /><p className="text-sm font-medium">No discussion yet</p><p className="mt-1 text-xs text-muted-foreground">Be the first to share an update.</p></div>}
               </TabsContent>
+              <TabsContent value="root-cause" className="space-y-4">
+                {issue.rootCause.trim() && !editingRootCause ? (
+                  <div className="rounded-xl border bg-muted/20 p-4 sm:p-5">
+                    <div className="solution-content text-sm leading-6 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeRichText(rootCause) }} />
+                    <div className="mt-4 flex justify-end border-t pt-3">
+                      <Button size="sm" variant="outline" onClick={() => setEditingRootCause(true)}><Pencil /> Edit root cause</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border bg-muted/20 p-3 sm:p-4">
+                    <RichTextEditor value={rootCause} onChange={setRootCause} placeholder="Describe the underlying cause of this issue..." />
+                    <div className="mt-3 flex items-center justify-between border-t pt-3">
+                      <span className="text-xs text-muted-foreground">Bold, italic, lists, code blocks, and images up to 1 MB</span>
+                      <div className="flex gap-2">
+                        {issue.rootCause.trim() ? <Button size="sm" variant="outline" onClick={() => { setRootCause(issue.rootCause); setEditingRootCause(false); }} disabled={savingRootCause}>Cancel</Button> : null}
+                        <Button size="sm" onClick={saveRootCause} disabled={savingRootCause}>{savingRootCause ? "Saving..." : "Save root cause"}</Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
               <TabsContent value="activity" className="space-y-3">
-                {issue.activity.length ? issue.activity.map((event) => <article key={event.id} className="flex gap-3 rounded-xl border px-4 py-3"><span className="mt-1 size-2 shrink-0 rounded-full bg-primary" /><div className="min-w-0 flex-1"><div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-center"><p className="text-sm font-semibold">{event.action}<span className="ml-2 font-normal text-muted-foreground">by {event.actor}</span></p><time className="text-xs text-muted-foreground">{formatDate(event.createdAt)}</time></div>{event.detail ? <p className="mt-1 text-sm text-muted-foreground">{event.detail}</p> : null}</div></article>) : <div className="rounded-xl border border-dashed px-4 py-8 text-center"><History className="mx-auto mb-2 size-5 text-muted-foreground" /><p className="text-sm font-medium">No activity yet</p></div>}
+                {issue.activity.length ? (
+                  <ol className="ml-2 border-l border-border">
+                    {issue.activity.map((event, index) => (
+                      <li key={event.id} className={`relative pb-6 pl-6 ${index === issue.activity.length - 1 ? "pb-0" : ""}`}>
+                        <span className="absolute top-1 left-[-5px] size-2.5 rounded-full border-2 border-background bg-primary" />
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+                          <p className="text-sm font-semibold">
+                            {event.action}<span className="ml-2 font-normal text-muted-foreground">by {event.actor}</span>
+                          </p>
+                          <time className="shrink-0 text-xs text-muted-foreground">{formatDate(event.createdAt)}</time>
+                        </div>
+                        {event.detail ? <p className="mt-1 text-sm text-muted-foreground">{event.detail}</p> : null}
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <div className="py-8 text-center text-muted-foreground">
+                    <History className="mx-auto mb-2 size-5" />
+                    <p className="text-sm font-medium">No activity yet</p>
+                  </div>
+                )}
               </TabsContent>
               <TabsContent value="solution" className="space-y-4">
-                <div className="rounded-xl border bg-muted/20 p-3 sm:p-4"><Textarea className="min-h-36 resize-y border-0 bg-transparent p-0 shadow-none focus-visible:ring-0" value={solution} onChange={(event) => setSolution(event.target.value)} placeholder="Describe the resolution, workaround, or proposed fix..." rows={5} maxLength={10000} /><div className="mt-3 flex items-center justify-between border-t pt-3"><span className="text-xs text-muted-foreground">{solution.length}/10000 characters</span><Button size="sm" onClick={saveSolution} disabled={savingSolution}>{savingSolution ? "Saving..." : "Save solution"}</Button></div></div>
+                {issue.solution.trim() && !editingSolution ? (
+                  <div className="rounded-xl border bg-muted/20 p-4 sm:p-5">
+                    <div className="solution-content text-sm leading-6 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeRichText(solution) }} />
+                    <div className="mt-4 flex justify-end border-t pt-3">
+                      <Button size="sm" variant="outline" onClick={() => setEditingSolution(true)}>
+                        <Pencil /> Edit solution
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border bg-muted/20 p-3 sm:p-4">
+                    <RichTextEditor value={solution} onChange={setSolution} placeholder="Describe the resolution, workaround, or proposed fix..." />
+                    <div className="mt-3 flex items-center justify-between border-t pt-3">
+                      <span className="text-xs text-muted-foreground">Bold, italic, code blocks, and images up to 1 MB</span>
+                      <div className="flex gap-2">
+                        {issue.solution.trim() ? (
+                          <Button size="sm" variant="outline" onClick={() => { setSolution(issue.solution); setEditingSolution(false); }} disabled={savingSolution}>Cancel</Button>
+                        ) : null}
+                        <Button size="sm" onClick={saveSolution} disabled={savingSolution}>{savingSolution ? "Saving..." : "Save solution"}</Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
             </CardContent>
           </Tabs>

@@ -1,0 +1,1 @@
+ALTER TABLE "DATA_Issues" ADD COLUMN "RootCause" text DEFAULT '' NOT NULL;
