@@ -15,13 +15,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       classification: string | null; classificationId: number | null; pic: string | null; picId: number | null; project: string | null; projectId: string | null;
       description: string; evidence: { name: string; size: number }[]; createdAt: string;
       createdBy: string | null; solution: string; rootCause: string;
+      hasRepairCost: boolean; repairCost: string | null; repairCostDetail: string; repairMethod: string | null;
+      additionalInfoSaved: boolean;
     }>(
       `SELECT 'BUG-' || lpad(i."Id"::text, 3, '0') AS "id", i."NewId" AS "newId",
         i."Title" AS "title", i."Status" AS "status", i."Criticality" AS "criticality",
         c."Name" AS "classification", i."ClassificationId" AS "classificationId",
         u."Name" AS "pic", i."PICId" AS "picId", p."Name" AS "project", p."NewId" AS "projectId",
         i."Description" AS "description", i."Evidence" AS "evidence",
-        i."CreatedDate" AS "createdAt", i."CreatedBy" AS "createdBy", i."Solution" AS "solution", i."RootCause" AS "rootCause"
+        i."CreatedDate" AS "createdAt", i."CreatedBy" AS "createdBy", i."Solution" AS "solution", i."RootCause" AS "rootCause",
+        i."HasRepairCost" AS "hasRepairCost", i."RepairCost" AS "repairCost", i."RepairCostDetail" AS "repairCostDetail", i."RepairMethod" AS "repairMethod", i."AdditionalInfoSaved" AS "additionalInfoSaved"
        FROM "DATA_Issues" i
        LEFT JOIN "CORE_Category" c ON c."Id" = i."ClassificationId"
        LEFT JOIN "CORE_User" u ON u."Id" = i."PICId"
@@ -81,7 +84,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const body = (await req.json().catch(() => null)) as { solution?: string; rootCause?: string; status?: string } | null;
+    const body = (await req.json().catch(() => null)) as {
+      solution?: string; rootCause?: string; status?: string;
+      additionalInfo?: { hasRepairCost?: boolean; repairCost?: number | null; repairCostDetail?: string; repairMethod?: string | null };
+    } | null;
     if (body?.status !== undefined) {
       if (body.status !== "Done" && body.status !== "Backlog") return fail("Status must be Done or Backlog", 400);
       const session = await getSession();
@@ -93,6 +99,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       );
       if (updated[0]) await addIssueActivity(updated[0].Id, session?.name ?? "System", body.status === "Done" ? "Issue closed" : "Issue re-opened");
       return updated[0] ? ok(updated[0]) : fail("Issue not found", 404);
+    }
+    if (body?.additionalInfo !== undefined) {
+      const info = body.additionalInfo;
+      if (!info || typeof info !== "object" || typeof info.hasRepairCost !== "boolean") return fail("Repair cost selection is required", 400);
+      if (info.hasRepairCost && (typeof info.repairCost !== "number" || !Number.isFinite(info.repairCost) || info.repairCost < 0 || info.repairCost > 9999999999.99)) return fail("Enter a valid repair cost", 400);
+      if (info.repairCostDetail !== undefined && typeof info.repairCostDetail !== "string") return fail("Repair cost detail must be text", 400);
+      if ((info.repairCostDetail?.length ?? 0) > 5000) return fail("Repair cost detail must be 5000 characters or fewer", 400);
+      if (info.repairMethod !== null && info.repairMethod !== undefined && info.repairMethod !== "Vendor" && info.repairMethod !== "Self Service") return fail("Repair method is invalid", 400);
+      const session = await getSession();
+      const rows = await query<{ Id: number }>(
+        `UPDATE "DATA_Issues" SET "HasRepairCost" = $2, "RepairCost" = $3, "RepairCostDetail" = $4, "RepairMethod" = $5, "AdditionalInfoSaved" = true, "UpdatedBy" = $6, "UpdatedDate" = now()
+         WHERE "IsActive" = true AND ("NewId"::text = $1 OR ('BUG-' || lpad("Id"::text, 3, '0')) = $1)
+         RETURNING "Id"`,
+        [id, info.hasRepairCost, info.hasRepairCost ? info.repairCost : null, info.hasRepairCost ? (info.repairCostDetail ?? "").trim() : "", info.repairMethod ?? null, session?.email ?? "System"]
+      );
+      if (rows[0]) await addIssueActivity(rows[0].Id, session?.name ?? "System", "Additional info updated", "Updated repair cost information.");
+      return rows[0] ? ok({ hasRepairCost: info.hasRepairCost, repairCost: info.hasRepairCost ? info.repairCost : null, repairCostDetail: info.hasRepairCost ? (info.repairCostDetail ?? "").trim() : "", repairMethod: info.repairMethod ?? null, additionalInfoSaved: true }) : fail("Issue not found", 404);
     }
     const field = typeof body?.solution === "string" ? "Solution" : typeof body?.rootCause === "string" ? "RootCause" : null;
     const content = field === "Solution" ? body?.solution : body?.rootCause;

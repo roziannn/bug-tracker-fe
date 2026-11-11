@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Check, CheckCircle2, FileText, History, Lightbulb, MessageSquare, Pencil, Reply, RotateCcw, Target, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, FileText, History, Info, Lightbulb, MessageSquare, Pencil, Reply, RotateCcw, Target, Trash2, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,9 @@ import { appToast } from "@/lib/app-toast";
 import { formatDate } from "@/lib/date";
 import { requestJson } from "@/lib/request";
 import type { Paged, User } from "@/types";
+
+const rupiahNumberFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
+const rupiahCurrencyFormat = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 
 type IssueDetail = {
   id: string;
@@ -31,6 +34,11 @@ type IssueDetail = {
   createdBy: string | null;
   solution: string;
   rootCause: string;
+  hasRepairCost: boolean;
+  repairCost: string | null;
+  repairCostDetail: string;
+  repairMethod: "Vendor" | "Self Service" | null;
+  additionalInfoSaved: boolean;
   comments: { id: number; parentCommentId: number | null; author: string; body: string; createdAt: string }[];
   activity: { id: number; actor: string; action: string; detail: string; createdAt: string }[];
 };
@@ -139,6 +147,12 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
   const [editingSolution, setEditingSolution] = useState(false);
   const [rootCause, setRootCause] = useState("");
   const [editingRootCause, setEditingRootCause] = useState(false);
+  const [hasRepairCost, setHasRepairCost] = useState(false);
+  const [repairCost, setRepairCost] = useState("");
+  const [repairCostDetail, setRepairCostDetail] = useState("");
+  const [repairMethod, setRepairMethod] = useState<"Vendor" | "Self Service" | "">("");
+  const [editingAdditionalInfo, setEditingAdditionalInfo] = useState(false);
+  const [savingAdditionalInfo, setSavingAdditionalInfo] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
@@ -153,7 +167,15 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
   useEffect(() => {
     requestJson<Paged<User>>("/api/users?pageSize=100").then((result) => setUsers(result.data.filter((user) => user.IsActive))).catch(() => setUsers([]));
     requestJson<IssueDetail>(`/api/issues/${encodeURIComponent(id)}`)
-      .then((data) => { setIssue(data); setSolution(data.solution); setRootCause(data.rootCause ?? ""); })
+      .then((data) => {
+        setIssue(data);
+        setSolution(data.solution);
+        setRootCause(data.rootCause ?? "");
+        setHasRepairCost(data.hasRepairCost ?? false);
+        setRepairCost(data.repairCost == null ? "" : String(data.repairCost));
+        setRepairCostDetail(data.repairCostDetail ?? "");
+        setRepairMethod(data.repairMethod ?? "");
+      })
       .catch((err) => {
         const message = err instanceof Error ? err.message : "Something went wrong, please try again.";
         setLoadError(message);
@@ -248,6 +270,31 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
     } finally { setSavingRootCause(false); }
   }
 
+  async function saveAdditionalInfo() {
+    if (savingAdditionalInfo) return;
+    const parsedCost = Number(repairCost);
+    if (hasRepairCost && (!repairCost || !Number.isFinite(parsedCost) || parsedCost < 0)) {
+      appToast.error({ title: "Enter a valid repair cost" });
+      return;
+    }
+    setSavingAdditionalInfo(true);
+    try {
+      const result = await requestJson<{ hasRepairCost: boolean; repairCost: number | null; repairCostDetail: string; repairMethod: "Vendor" | "Self Service" | null; additionalInfoSaved: boolean }>(
+        `/api/issues/${encodeURIComponent(id)}`,
+        "PATCH",
+        { additionalInfo: { hasRepairCost, repairCost: hasRepairCost ? parsedCost : null, repairCostDetail, repairMethod: repairMethod || null } }
+      );
+      setIssue((current) => current ? { ...current, ...result, repairCost: result.repairCost == null ? null : String(result.repairCost) } : current);
+      setRepairCost(result.repairCost == null ? "" : String(result.repairCost));
+      setRepairCostDetail(result.repairCostDetail);
+      setRepairMethod(result.repairMethod ?? "");
+      setEditingAdditionalInfo(false);
+      appToast.success({ title: "Additional info saved" });
+    } catch (err) {
+      appToast.error({ title: "Failed to save additional info", description: err instanceof Error ? err.message : undefined });
+    } finally { setSavingAdditionalInfo(false); }
+  }
+
   async function toggleClosed() {
     if (!issue || changingStatus) return;
     const status = issue.status === "Done" ? "Backlog" : "Done";
@@ -271,121 +318,109 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
     >
       {!loaded ? <Card><CardContent className="py-10 text-center text-muted-foreground">Loading issue...</CardContent></Card> : null}
       {loaded && !issue ? <Card><CardHeader><CardTitle>{loadError ? "Failed to load issue" : "Issue not found"}</CardTitle><CardDescription>{loadError ?? "Issue dengan ID tersebut tidak ditemukan."}</CardDescription></CardHeader></Card> : null}
-      {issue ? <div className="space-y-6">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <Card>
-          <CardHeader className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2"><Badge variant={issue.status === "Draft" ? "outline" : "secondary"}>{issue.status}</Badge><Badge variant="outline">{issue.criticality}</Badge></div>
-            <CardTitle className="text-2xl">{issue.title || "Untitled draft"}</CardTitle>
-            <CardDescription>Created {formatDate(issue.createdAt)}{issue.createdBy ? ` by ${issue.createdBy}` : ""}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <section className="space-y-2"><h3 className="text-sm font-semibold">Description</h3><p className="whitespace-pre-wrap text-sm text-muted-foreground">{issue.description || "No description provided."}</p></section>
-            <section className="grid gap-4 border-t pt-4 sm:grid-cols-3">
-              <div><p className="text-xs text-muted-foreground">Issue classification</p><p className="font-medium">{issue.classification || "—"}</p></div>
-              <div><p className="text-xs text-muted-foreground">PIC</p><p className="font-medium">{issue.pic || "—"}</p></div>
-              <div><p className="text-xs text-muted-foreground">Project</p><p className="font-medium">{issue.project || "—"}</p></div>
-            </section>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Evidence</CardTitle><CardDescription>{issue.evidence.length} attached file{issue.evidence.length === 1 ? "" : "s"}</CardDescription></CardHeader>
-          <CardContent className="space-y-3">
-            {issue.evidence.length ? issue.evidence.map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center gap-3 rounded-lg border p-3"><FileText className="size-4 shrink-0 text-muted-foreground" /><div className="min-w-0"><p className="truncate text-sm font-medium">{file.name}</p><p className="text-xs text-muted-foreground">{fileSize(file.size)}</p></div></div>) : <p className="text-sm text-muted-foreground">No evidence attached.</p>}
-          </CardContent>
-        </Card>
-        </div>
-        <Card>
-          <Tabs defaultValue="discussion" className="gap-0">
-            <CardHeader className="gap-4 border-b pb-0">
-              <TabsList variant="line" className="h-11 w-full justify-start gap-6 rounded-none border-0 bg-transparent p-0">
-                <TabsTrigger value="discussion" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><MessageSquare />Discussion<span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px]">{issue.comments.length}</span></TabsTrigger>
-                <TabsTrigger value="solution" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><Lightbulb />Solution</TabsTrigger>
-                <TabsTrigger value="root-cause" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><Target />Root Cause</TabsTrigger>
-                <TabsTrigger value="activity" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><History />Activity</TabsTrigger>
-              </TabsList>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <TabsContent value="discussion" className="space-y-4">
-                <div className="rounded-xl border bg-muted/20 p-3 sm:p-4">
-                  <MentionTextarea className="min-h-24 resize-y border-0 bg-transparent p-0 shadow-none focus-visible:ring-0" value={commentText} onChange={setCommentText} users={users} placeholder="Share an update or ask a question..." />
-                  <div className="mt-3 flex items-center justify-between border-t pt-3"><span className="text-xs text-muted-foreground">Comments are visible to the issue team.</span><Button size="sm" onClick={postComment} disabled={!commentText.trim() || postingComment}>{postingComment ? "Posting..." : "Post comment"}</Button></div>
-                </div>
-                {issue.comments.filter((comment) => !comment.parentCommentId).length ? <div className="space-y-3">{issue.comments.filter((comment) => !comment.parentCommentId).map((comment) => <article key={comment.id} className="rounded-xl border px-4 py-3"><div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold">{comment.author}</p><div className="flex items-center gap-2"><time className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</time>{editingCommentId !== comment.id ? <><Button type="button" size="icon-sm" variant="ghost" aria-label="Reply to comment" title="Reply" disabled={busyCommentId !== null} onClick={() => { setReplyingCommentId(replyingCommentId === comment.id ? null : comment.id); setReplyText(""); }}><Reply /></Button><Button type="button" size="icon-sm" variant="ghost" aria-label="Edit comment" title="Edit comment" disabled={busyCommentId !== null} onClick={() => { setEditingCommentId(comment.id); setEditingCommentText(comment.body); }}><Pencil /></Button><Button type="button" size="icon-sm" variant="ghost" aria-label="Delete comment" title="Delete comment" disabled={busyCommentId !== null} onClick={() => deleteComment(comment.id)}><Trash2 className="text-destructive" /></Button></> : null}</div></div>{editingCommentId === comment.id ? <div className="space-y-2"><MentionTextarea autoFocus className="min-h-20 resize-y" value={editingCommentText} onChange={setEditingCommentText} users={users} /> <div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" disabled={busyCommentId === comment.id} onClick={() => { setEditingCommentId(null); setEditingCommentText(""); }}><X />Cancel</Button><Button type="button" size="sm" disabled={!editingCommentText.trim() || busyCommentId === comment.id} onClick={() => saveCommentEdit(comment.id)}>{busyCommentId === comment.id ? "Saving..." : <><Check />Save</>}</Button></div></div> : <p className="whitespace-pre-wrap text-sm leading-6"><MentionText text={comment.body} users={users} /></p>}{issue.comments.filter((reply) => reply.parentCommentId === comment.id).map((reply) => <div key={reply.id} className="ml-5 mt-3 rounded-lg border-l-2 bg-muted/30 px-3 py-2"><div className="mb-1 flex items-center justify-between gap-3"><p className="text-sm font-semibold">{reply.author}</p><div className="flex items-center gap-2"><time className="text-xs text-muted-foreground">{formatDate(reply.createdAt)}</time><Button type="button" size="icon-sm" variant="ghost" aria-label="Edit reply" title="Edit reply" disabled={busyCommentId !== null} onClick={() => { setEditingCommentId(reply.id); setEditingCommentText(reply.body); }}><Pencil /></Button><Button type="button" size="icon-sm" variant="ghost" aria-label="Delete reply" title="Delete reply" disabled={busyCommentId !== null} onClick={() => deleteComment(reply.id)}><Trash2 className="text-destructive" /></Button></div></div>{editingCommentId === reply.id ? <div className="space-y-2"><MentionTextarea autoFocus className="min-h-20 resize-y" value={editingCommentText} onChange={setEditingCommentText} users={users} /><div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" disabled={busyCommentId === reply.id} onClick={() => { setEditingCommentId(null); setEditingCommentText(""); }}><X />Cancel</Button><Button type="button" size="sm" disabled={!editingCommentText.trim() || busyCommentId === reply.id} onClick={() => saveCommentEdit(reply.id)}>{busyCommentId === reply.id ? "Saving..." : <><Check />Save</>}</Button></div></div> : <p className="whitespace-pre-wrap text-sm leading-6"><MentionText text={reply.body} users={users} /></p>}</div>)}{replyingCommentId === comment.id ? <div className="ml-5 mt-3 space-y-2 border-l-2 pl-3"><MentionTextarea autoFocus className="min-h-20 resize-y" value={replyText} onChange={setReplyText} users={users} placeholder={`Reply to ${comment.author}...`} /><div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" disabled={postingComment} onClick={() => { setReplyingCommentId(null); setReplyText(""); }}>Cancel</Button><Button type="button" size="sm" disabled={!replyText.trim() || postingComment} onClick={() => postReply(comment.id)}>{postingComment ? "Posting..." : <><Reply />Post reply</>}</Button></div></div> : null}</article>)}</div> : <div className="rounded-xl border border-dashed px-4 py-8 text-center"><MessageSquare className="mx-auto mb-2 size-5 text-muted-foreground" /><p className="text-sm font-medium">No discussion yet</p><p className="mt-1 text-xs text-muted-foreground">Be the first to share an update.</p></div>}
-              </TabsContent>
-              <TabsContent value="root-cause" className="space-y-4">
-                {issue.rootCause.trim() && !editingRootCause ? (
-                  <div className="rounded-xl border bg-muted/20 p-4 sm:p-5">
-                    <div className="solution-content text-sm leading-6 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeRichText(rootCause) }} />
-                    <div className="mt-4 flex justify-end border-t pt-3">
-                      <Button size="sm" variant="outline" onClick={() => setEditingRootCause(true)}><Pencil /> Edit root cause</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border bg-muted/20 p-3 sm:p-4">
-                    <RichTextEditor value={rootCause} onChange={setRootCause} placeholder="Describe the underlying cause of this issue..." />
-                    <div className="mt-3 flex items-center justify-between border-t pt-3">
-                      <span className="text-xs text-muted-foreground">Bold, italic, lists, code blocks, and images up to 1 MB</span>
-                      <div className="flex gap-2">
-                        {issue.rootCause.trim() ? <Button size="sm" variant="outline" onClick={() => { setRootCause(issue.rootCause); setEditingRootCause(false); }} disabled={savingRootCause}>Cancel</Button> : null}
-                        <Button size="sm" onClick={saveRootCause} disabled={savingRootCause}>{savingRootCause ? "Saving..." : "Save root cause"}</Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="activity" className="space-y-3">
-                {issue.activity.length ? (
-                  <ol className="ml-2 border-l border-border">
-                    {issue.activity.map((event, index) => (
-                      <li key={event.id} className={`relative pb-6 pl-6 ${index === issue.activity.length - 1 ? "pb-0" : ""}`}>
-                        <span className="absolute top-1 left-[-5px] size-2.5 rounded-full border-2 border-background bg-primary" />
-                        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-                          <p className="text-sm font-semibold">
-                            {event.action}<span className="ml-2 font-normal text-muted-foreground">by {event.actor}</span>
-                          </p>
-                          <time className="shrink-0 text-xs text-muted-foreground">{formatDate(event.createdAt)}</time>
+      {issue ? (
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(320px,1fr)]">
+          <Card className="lg:col-start-1 lg:row-start-1">
+              <CardHeader className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2"><Badge variant={issue.status === "Draft" ? "outline" : "secondary"}>{issue.status}</Badge><Badge variant="outline">{issue.criticality}</Badge></div>
+                <CardTitle className="text-2xl">{issue.title || "Untitled draft"}</CardTitle>
+                <CardDescription>Created {formatDate(issue.createdAt)}{issue.createdBy ? ` by ${issue.createdBy}` : ""}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <section className="space-y-2"><h3 className="text-sm font-semibold">Description</h3><p className="whitespace-pre-wrap text-sm text-muted-foreground">{issue.description || "No description provided."}</p></section>
+                <section className="grid gap-4 border-t pt-4 sm:grid-cols-3"><div><p className="text-xs text-muted-foreground">Issue classification</p><p className="font-medium">{issue.classification || "—"}</p></div><div><p className="text-xs text-muted-foreground">PIC</p><p className="font-medium">{issue.pic || "—"}</p></div><div><p className="text-xs text-muted-foreground">Project</p><p className="font-medium">{issue.project || "—"}</p></div></section>
+              </CardContent>
+            </Card>
+          <Card className="lg:col-start-2 lg:row-start-1"><CardHeader><CardTitle>Evidence</CardTitle><CardDescription>{issue.evidence.length} attached file{issue.evidence.length === 1 ? "" : "s"}</CardDescription></CardHeader><CardContent className="space-y-3">{issue.evidence.length ? issue.evidence.map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center gap-3 rounded-lg border p-3"><FileText className="size-4 shrink-0 text-muted-foreground" /><div className="min-w-0"><p className="truncate text-sm font-medium">{file.name}</p><p className="text-xs text-muted-foreground">{fileSize(file.size)}</p></div></div>) : <p className="text-sm text-muted-foreground">No evidence attached.</p>}</CardContent></Card>
+          <Card className="gap-0 overflow-hidden py-0 lg:col-span-2">
+            <Tabs defaultValue="root-cause" className="gap-0">
+                <CardHeader className="gap-4"><div className="overflow-x-auto pb-2"><TabsList variant="line" className="h-11 w-max min-w-full justify-start gap-4 rounded-none border-0 bg-transparent p-0">
+                  <TabsTrigger value="root-cause" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><Target />Root Cause</TabsTrigger>
+                  <TabsTrigger value="solution" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><Lightbulb />Solution</TabsTrigger>
+                  <TabsTrigger value="additional-info" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><Info />Additional Info</TabsTrigger>
+
+                  <TabsTrigger value="discussion" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><MessageSquare />Discussion<span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px]">{issue.comments.length}</span></TabsTrigger>
+                  <TabsTrigger value="activity" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><History />Activity</TabsTrigger>
+                </TabsList></div></CardHeader>
+                <CardContent className="pt-5">
+                  <TabsContent value="solution" className="space-y-4">
+                    {issue.solution.trim() && !editingSolution ? <div className="rounded-xl border bg-muted/20 p-4 sm:p-5"><div className="solution-content text-sm leading-6 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeRichText(solution) }} /><div className="mt-4 flex justify-end border-t pt-3"><Button size="sm" variant="outline" onClick={() => setEditingSolution(true)}><Pencil /> Edit solution</Button></div></div> : <div className="space-y-3"><RichTextEditor value={solution} onChange={setSolution} placeholder="Describe the resolution, workaround, or proposed fix..." /><div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3"><span className="text-xs text-muted-foreground">Bold, italic, lists, code blocks, and images up to 1 MB</span><div className="flex gap-2">{issue.solution.trim() ? <Button size="sm" variant="outline" onClick={() => { setSolution(issue.solution); setEditingSolution(false); }} disabled={savingSolution}>Cancel</Button> : null}<Button size="sm" onClick={saveSolution} disabled={savingSolution}>{savingSolution ? "Saving..." : "Save solution"}</Button></div></div></div>}
+                  </TabsContent>
+                  <TabsContent value="root-cause" className="space-y-4">
+                    {issue.rootCause.trim() && !editingRootCause ? <div className="rounded-xl border bg-muted/20 p-4 sm:p-5"><div className="solution-content text-sm leading-6 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeRichText(rootCause) }} /><div className="mt-4 flex justify-end border-t pt-3"><Button size="sm" variant="outline" onClick={() => setEditingRootCause(true)}><Pencil /> Edit root cause</Button></div></div> : <div className="space-y-3"><RichTextEditor value={rootCause} onChange={setRootCause} placeholder="Describe the underlying cause of this issue..." /><div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3"><span className="text-xs text-muted-foreground">Bold, italic, lists, code blocks, and images up to 1 MB</span><div className="flex gap-2">{issue.rootCause.trim() ? <Button size="sm" variant="outline" onClick={() => { setRootCause(issue.rootCause); setEditingRootCause(false); }} disabled={savingRootCause}>Cancel</Button> : null}<Button size="sm" onClick={saveRootCause} disabled={savingRootCause}>{savingRootCause ? "Saving..." : "Save root cause"}</Button></div></div></div>}
+                  </TabsContent>
+                  <TabsContent value="additional-info" className="space-y-5">
+                    {issue.additionalInfoSaved && !editingAdditionalInfo ? (
+                      <div className="rounded-xl border bg-muted/20 p-4 sm:p-5">
+                        <div className="grid grid-cols-[130px_minmax(0,1fr)] gap-x-3 gap-y-3">
+                          <p className="text-sm font-medium">Repair cost:</p><p className="text-sm">{issue.hasRepairCost ? "Required" : "Not required"}</p>
+                          {issue.hasRepairCost ? <>
+                            <p className="text-sm font-medium">Amount:</p><p className="text-sm">{issue.repairCost == null ? "—" : rupiahCurrencyFormat.format(Number(issue.repairCost))}</p>
+                            {issue.repairCostDetail ? <><p className="text-sm font-medium">Cost details:</p><p className="whitespace-pre-wrap text-sm text-muted-foreground">{issue.repairCostDetail}</p></> : null}
+                          </> : null}
+                          <p className="text-sm font-medium">Repair method:</p><p className="text-sm">{issue.repairMethod === "Vendor" ? "By Vendor" : issue.repairMethod ?? "—"}</p>
                         </div>
-                        {event.detail ? <p className="mt-1 text-sm text-muted-foreground">{event.detail}</p> : null}
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <div className="py-8 text-center text-muted-foreground">
-                    <History className="mx-auto mb-2 size-5" />
-                    <p className="text-sm font-medium">No activity yet</p>
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="solution" className="space-y-4">
-                {issue.solution.trim() && !editingSolution ? (
-                  <div className="rounded-xl border bg-muted/20 p-4 sm:p-5">
-                    <div className="solution-content text-sm leading-6 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeRichText(solution) }} />
-                    <div className="mt-4 flex justify-end border-t pt-3">
-                      <Button size="sm" variant="outline" onClick={() => setEditingSolution(true)}>
-                        <Pencil /> Edit solution
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border bg-muted/20 p-3 sm:p-4">
-                    <RichTextEditor value={solution} onChange={setSolution} placeholder="Describe the resolution, workaround, or proposed fix..." />
-                    <div className="mt-3 flex items-center justify-between border-t pt-3">
-                      <span className="text-xs text-muted-foreground">Bold, italic, code blocks, and images up to 1 MB</span>
+                        <div className="mt-4 flex justify-end border-t pt-3"><Button size="sm" variant="outline" onClick={() => setEditingAdditionalInfo(true)}><Pencil /> Edit additional info</Button></div>
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                    <label className="flex cursor-pointer items-center gap-3 text-sm font-medium">
+                      <input type="checkbox" className="size-4 accent-primary" checked={hasRepairCost} onChange={(event) => setHasRepairCost(event.target.checked)} />
+                      Does this repair require a cost?
+                    </label>
+                    {hasRepairCost ? (
+                      <div className="space-y-4">
+                        <div className="grid gap-2">
+                          <label htmlFor="repair-cost" className="text-sm font-medium">Repair cost amount</label>
+                          <div className="flex h-9 w-full items-center rounded-md border border-input bg-background shadow-xs focus-within:ring-3 focus-within:ring-ring/50">
+                            <span className="px-3 text-sm text-muted-foreground">Rp</span>
+                            <input id="repair-cost" type="text" inputMode="numeric" value={repairCost ? rupiahNumberFormat.format(Number(repairCost)) : ""} onChange={(event) => setRepairCost(event.target.value.replace(/\D/g, ""))} className="h-full min-w-0 flex-1 rounded-r-md bg-transparent pr-3 text-sm outline-none" placeholder="0" />
+                          </div>
+                        </div>
+                        <div className="grid gap-2">
+                          <label htmlFor="repair-cost-detail" className="text-sm font-medium">Cost details</label>
+                          <textarea id="repair-cost-detail" value={repairCostDetail} onChange={(event) => setRepairCostDetail(event.target.value)} rows={4} maxLength={5000} className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50" placeholder="Describe the repair cost..." />
+                        </div>
+                      </div>
+                    ) : null}
+                    <fieldset className="space-y-3">
+                      <legend className="text-sm font-medium">Repair method</legend>
+                      <div className="flex flex-wrap gap-5">
+                        {(["Vendor", "Self Service"] as const).map((method) => (
+                          <label key={method} className="flex cursor-pointer items-center gap-2 text-sm">
+                            <input type="checkbox" className="size-4 accent-primary" checked={repairMethod === method} onChange={() => setRepairMethod(repairMethod === method ? "" : method)} />
+                            {method === "Vendor" ? "By Vendor" : "Self Service"}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <div className="flex justify-end border-t pt-4">
                       <div className="flex gap-2">
-                        {issue.solution.trim() ? (
-                          <Button size="sm" variant="outline" onClick={() => { setSolution(issue.solution); setEditingSolution(false); }} disabled={savingSolution}>Cancel</Button>
-                        ) : null}
-                        <Button size="sm" onClick={saveSolution} disabled={savingSolution}>{savingSolution ? "Saving..." : "Save solution"}</Button>
+                        {issue.additionalInfoSaved ? <Button variant="outline" onClick={() => {
+                          setHasRepairCost(issue.hasRepairCost);
+                          setRepairCost(issue.repairCost ?? "");
+                          setRepairCostDetail(issue.repairCostDetail);
+                          setRepairMethod(issue.repairMethod ?? "");
+                          setEditingAdditionalInfo(false);
+                        }} disabled={savingAdditionalInfo}>Cancel</Button> : null}
+                        <Button onClick={saveAdditionalInfo} disabled={savingAdditionalInfo}>{savingAdditionalInfo ? "Saving..." : "Save additional info"}</Button>
                       </div>
                     </div>
-                  </div>
-                )}
-              </TabsContent>
-            </CardContent>
-          </Tabs>
-        </Card>
-      </div> : null}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="discussion" className="space-y-4">
+                    <div className="rounded-xl border bg-muted/20 p-3 sm:p-4"><MentionTextarea className="min-h-24 resize-y border-0 bg-transparent p-0 shadow-none focus-visible:ring-0" value={commentText} onChange={setCommentText} users={users} placeholder="Share an update or ask a question..." /><div className="mt-3 flex items-center justify-between border-t pt-3"><span className="text-xs text-muted-foreground">Comments are visible to the issue team.</span><Button size="sm" onClick={postComment} disabled={!commentText.trim() || postingComment}>{postingComment ? "Posting..." : "Post comment"}</Button></div></div>
+                    {issue.comments.filter((comment) => !comment.parentCommentId).length ? <div className="space-y-3">{issue.comments.filter((comment) => !comment.parentCommentId).map((comment) => <article key={comment.id} className="rounded-xl border px-4 py-3"><div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold">{comment.author}</p><div className="flex items-center gap-2"><time className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</time><Button type="button" size="icon-sm" variant="ghost" aria-label="Reply to comment" title="Reply" disabled={busyCommentId !== null} onClick={() => { setReplyingCommentId(replyingCommentId === comment.id ? null : comment.id); setReplyText(""); }}><Reply /></Button><Button type="button" size="icon-sm" variant="ghost" aria-label="Edit comment" title="Edit comment" disabled={busyCommentId !== null} onClick={() => { setEditingCommentId(comment.id); setEditingCommentText(comment.body); }}><Pencil /></Button><Button type="button" size="icon-sm" variant="ghost" aria-label="Delete comment" title="Delete comment" disabled={busyCommentId !== null} onClick={() => deleteComment(comment.id)}><Trash2 className="text-destructive" /></Button></div></div>{editingCommentId === comment.id ? <div className="space-y-2"><MentionTextarea autoFocus className="min-h-20 resize-y" value={editingCommentText} onChange={setEditingCommentText} users={users} /><div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { setEditingCommentId(null); setEditingCommentText(""); }}><X />Cancel</Button><Button type="button" size="sm" disabled={!editingCommentText.trim() || busyCommentId === comment.id} onClick={() => saveCommentEdit(comment.id)}>{busyCommentId === comment.id ? "Saving..." : <><Check />Save</>}</Button></div></div> : <p className="whitespace-pre-wrap text-sm leading-6"><MentionText text={comment.body} users={users} /></p>}{issue.comments.filter((reply) => reply.parentCommentId === comment.id).map((reply) => <div key={reply.id} className="ml-5 mt-3 rounded-lg border-l-2 bg-muted/30 px-3 py-2"><div className="mb-1 flex items-center justify-between gap-2"><p className="text-xs font-medium">{reply.author}</p><div className="flex items-center gap-1"><time className="text-xs text-muted-foreground">{formatDate(reply.createdAt)}</time><Button type="button" size="icon-sm" variant="ghost" aria-label="Edit reply" disabled={busyCommentId !== null} onClick={() => { setEditingCommentId(reply.id); setEditingCommentText(reply.body); }}><Pencil /></Button><Button type="button" size="icon-sm" variant="ghost" aria-label="Delete reply" disabled={busyCommentId !== null} onClick={() => deleteComment(reply.id)}><Trash2 className="text-destructive" /></Button></div></div>{editingCommentId === reply.id ? <div className="space-y-2"><MentionTextarea autoFocus className="min-h-20 resize-y" value={editingCommentText} onChange={setEditingCommentText} users={users} /><div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { setEditingCommentId(null); setEditingCommentText(""); }}>Cancel</Button><Button type="button" size="sm" disabled={!editingCommentText.trim() || busyCommentId === reply.id} onClick={() => saveCommentEdit(reply.id)}>{busyCommentId === reply.id ? "Saving..." : <><Check />Save</>}</Button></div></div> : <p className="whitespace-pre-wrap text-sm leading-6"><MentionText text={reply.body} users={users} /></p>}</div>)}{replyingCommentId === comment.id ? <div className="ml-5 mt-3 space-y-2 border-l-2 pl-3"><MentionTextarea autoFocus className="min-h-20 resize-y" value={replyText} onChange={setReplyText} users={users} placeholder={`Reply to ${comment.author}...`} /><div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { setReplyingCommentId(null); setReplyText(""); }}>Cancel</Button><Button type="button" size="sm" disabled={!replyText.trim() || postingComment} onClick={() => postReply(comment.id)}>{postingComment ? "Posting..." : <><Reply />Post reply</>}</Button></div></div> : null}</article>)}</div> : <div className="rounded-xl border border-dashed px-4 py-8 text-center"><MessageSquare className="mx-auto mb-2 size-5 text-muted-foreground" /><p className="text-sm font-medium">No discussion yet</p><p className="mt-1 text-xs text-muted-foreground">Be the first to share an update.</p></div>}
+                  </TabsContent>
+                  <TabsContent value="activity" className="space-y-3">{issue.activity.length ? <ol className="ml-2 border-l border-border">{issue.activity.map((event, index) => <li key={event.id} className={`relative pb-6 pl-6 ${index === issue.activity.length - 1 ? "pb-0" : ""}`}><span className="absolute top-1 left-[-5px] size-2.5 rounded-full border-2 border-background bg-primary" /><div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4"><p className="text-sm font-semibold">{event.action}<span className="ml-2 font-normal text-muted-foreground">by {event.actor}</span></p><time className="shrink-0 text-xs text-muted-foreground">{formatDate(event.createdAt)}</time></div>{event.detail ? <p className="mt-1 text-sm text-muted-foreground">{event.detail}</p> : null}</li>)}</ol> : <div className="py-8 text-center text-muted-foreground"><History className="mx-auto mb-2 size-5" /><p className="text-sm font-medium">No activity yet</p></div>}</TabsContent>
+
+                </CardContent>
+              </Tabs>
+          </Card>
+        </div>
+      ) : null}
       <CredentialConfirmDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen} actionLabel="Close issue" onVerified={toggleClosed} />
     </AppShell>
   );

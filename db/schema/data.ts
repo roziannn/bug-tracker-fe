@@ -1,5 +1,5 @@
 // Tabel transaksi / flow: prefix DATA_
-import { date, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, date, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { auditColumns } from "./_columns";
 import { coreCategory, coreUser } from "./core";
 
@@ -83,6 +83,11 @@ export const dataIssues = pgTable("DATA_Issues", {
   Description: text("Description").notNull().default(""),
   Solution: text("Solution").notNull().default(""),
   RootCause: text("RootCause").notNull().default(""),
+  HasRepairCost: boolean("HasRepairCost").notNull().default(false),
+  RepairCost: numeric("RepairCost", { precision: 12, scale: 2 }),
+  RepairCostDetail: text("RepairCostDetail").notNull().default(""),
+  RepairMethod: varchar("RepairMethod", { length: 20 }),
+  AdditionalInfoSaved: boolean("AdditionalInfoSaved").notNull().default(false),
   Status: varchar("Status", { length: 30 }).notNull().default("Draft"),
   ClassificationId: integer("ClassificationId").references(() => coreCategory.Id, { onDelete: "set null" }),
   Criticality: varchar("Criticality", { length: 50 }).notNull().default("Tier 2 - Major"),
