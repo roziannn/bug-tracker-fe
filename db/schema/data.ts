@@ -1,9 +1,21 @@
 // Tabel transaksi / flow: prefix DATA_
-import { boolean, customType, date, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, customType, date, index, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { auditColumns } from "./_columns";
 import { coreCategory, coreUser } from "./core";
 
 const bytea = customType<{ data: Buffer | null; driverData: Buffer | null }>({ dataType: () => "bytea" });
+
+export const dataDatabaseMonitorSamples = pgTable(
+  "DATA_DatabaseMonitorSamples",
+  {
+    Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+    ServerKey: varchar("ServerKey", { length: 100 }).notNull(),
+    Status: varchar("Status", { length: 10 }).notNull(),
+    LatencyMs: integer("LatencyMs"),
+    CheckedDate: timestamp("CheckedDate", { mode: "string" }).notNull().defaultNow(),
+  },
+  (t) => [index("DATA_DatabaseMonitorSamples_ServerKey_CheckedDate_idx").on(t.ServerKey, t.CheckedDate)]
+);
 
 export const dataProjects = pgTable(
   "DATA_Projects",

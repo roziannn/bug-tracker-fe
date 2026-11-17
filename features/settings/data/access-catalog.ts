@@ -50,6 +50,7 @@ const rootMenus = [
     ],
   },
   { id: "settings-categories", path: "/settings/category", icon: "FolderOpenDot", label: "Categories", parentId: "settings", actions: [] },
+  { id: "settings-database-monitor", path: "/settings/database-monitor", icon: "Database", label: "Database Monitor", parentId: "settings", actions: [] },
   { id: "settings-issue-classification", path: "/settings/category/issue-classification", icon: "CircleDot", label: "Issue Classification", parentId: "settings-categories", actions: [] },
 ] as const;
 

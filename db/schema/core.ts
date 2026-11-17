@@ -103,6 +103,21 @@ export const coreEnv = pgTable(
   (t) => [uniqueIndex("CORE_Env_Environment_Key_key").on(t.Environment, t.Key)]
 );
 
+// PostgreSQL endpoints registered for the database monitoring page. Connection strings
+// are encrypted by the application before they are stored in ConnectionSecret.
+export const coreDatabaseServer = pgTable(
+  "CORE_DatabaseServer",
+  {
+    Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+    NewId: uuid("NewId").notNull().defaultRandom().unique(),
+    Name: varchar("Name", { length: 100 }).notNull(),
+    Provider: varchar("Provider", { length: 30 }).notNull(),
+    ConnectionSecret: text("ConnectionSecret").notNull(),
+    ...auditColumns,
+  },
+  (t) => [uniqueIndex("CORE_DatabaseServer_Name_key").on(t.Name)]
+);
+
 // Nilai-nilai kategori (Settings → Categories). CategoryName = nama kategorinya (mis. "Audit Trail Outcome"),
 // Name = salah satu nilainya (mis. "Success"). Satu nilai satu baris.
 export const coreCategory = pgTable(
