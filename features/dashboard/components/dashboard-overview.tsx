@@ -224,16 +224,6 @@ export function DashboardOverview() {
       activeNav="overview"
       eyebrow="Sprint board"
       title="Product Quality Dashboard"
-      toolbar={
-        <div>
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Issue monitoring and triage</h2>
-            <p className="text-sm text-muted-foreground">
-              Pantau daftar issue, prioritas, dan workflow triage dalam satu tampilan.
-            </p>
-          </div>
-        </div>
-      }
     >
       <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
         {actualOverviewCards.map((card) => {
@@ -276,7 +266,6 @@ export function DashboardOverview() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Issue flow</h2>
-            <p className="text-sm text-muted-foreground">Shared components are already wired for cards, tables, dialogs, filters, and navigation.</p>
           </div>
           <TabsList variant="line">
             <TabsTrigger value="active">Active sprint</TabsTrigger>
@@ -308,10 +297,6 @@ export function DashboardOverview() {
                 </ChartContainer>
                 )}
               </CardContent>
-              <CardFooter className="justify-between gap-3 text-sm text-muted-foreground">
-                <span>{issuesLoading ? "Loading current workload…" : busiestTeam ? `${busiestTeam.team} has the most assigned issues.` : "No assigned issues yet."}</span>
-                {busiestTeam ? <Badge variant="secondary">{busiestTeam.total} issues</Badge> : null}
-              </CardFooter>
             </Card>
 
             <Card>
@@ -359,10 +344,6 @@ export function DashboardOverview() {
                   </PieChart>
                 </ChartContainer>
               </CardContent>
-              <CardFooter className="justify-between gap-3 text-sm text-muted-foreground">
-                <span>{urgentIssues} items are still in Critical or High priority.</span>
-                <Badge variant="outline">Needs daily triage</Badge>
-              </CardFooter>
             </Card>
 
             <Card>
@@ -386,10 +367,6 @@ export function DashboardOverview() {
                 </ChartContainer>
                 )}
               </CardContent>
-              <CardFooter className="justify-between gap-3 text-sm text-muted-foreground">
-                <span>{issuesLoading ? "Loading current status counts…" : busiestStatus ? `${busiestStatus.status} currently holds the most issues.` : "No issues yet."}</span>
-                {busiestStatus ? <Badge variant="secondary">{busiestStatus.total} issues</Badge> : null}
-              </CardFooter>
             </Card>
           </div>
 
@@ -415,10 +392,6 @@ export function DashboardOverview() {
                   <div className="flex h-55 items-center justify-center text-sm text-muted-foreground">No Kanban cards to display.</div>
                 )}
               </CardContent>
-              <CardFooter className="justify-between gap-3 text-sm text-muted-foreground">
-                <span>Live snapshot from the Kanban board.</span>
-                <Badge variant="secondary">{kanbanCards.length} cards</Badge>
-              </CardFooter>
             </Card>
 
             <Card>

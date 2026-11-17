@@ -1,8 +1,9 @@
-import { Circle, CircleDot, FileSearch2, FolderOpenDot, Gauge, KanbanSquare, Settings, Users, type LucideIcon } from "lucide-react";
+import { Circle, CircleDot, ClipboardList, FileSearch2, FolderOpenDot, Gauge, KanbanSquare, Settings, Users, type LucideIcon } from "lucide-react";
 
 export const menuIcons: Record<string, LucideIcon> = {
   Gauge,
   CircleDot,
+  ClipboardList,
   KanbanSquare,
   Users,
   FolderOpenDot,

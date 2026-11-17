@@ -27,7 +27,7 @@ import {
 import { appToast } from "@/lib/app-toast";
 
 type AppShellProps = {
-  activeNav: "overview" | "issues" | "kanban" | "teams" | "projects" | "settings" | "audit-trail";
+  activeNav: "overview" | "issues" | "service-requests" | "kanban" | "teams" | "projects" | "settings" | "audit-trail";
   eyebrow?: string;
   title: string;
   toolbar?: ReactNode;
@@ -133,14 +133,6 @@ export function AppShell({
               <DropdownMenuItem render={<Link href="/profile" />}>
                 <UserCircle2 />
                 Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Bell />
-                Notifications
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} variant="destructive">

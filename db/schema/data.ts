@@ -1,7 +1,9 @@
 // Tabel transaksi / flow: prefix DATA_
-import { boolean, date, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, customType, date, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { auditColumns } from "./_columns";
 import { coreCategory, coreUser } from "./core";
+
+const bytea = customType<{ data: Buffer | null; driverData: Buffer | null }>({ dataType: () => "bytea" });
 
 export const dataProjects = pgTable(
   "DATA_Projects",
@@ -14,6 +16,7 @@ export const dataProjects = pgTable(
       .notNull()
       .references(() => coreUser.Id, { onDelete: "restrict" }),
     Description: text("Description").notNull().default(""),
+    TechStack: jsonb("TechStack").$type<{ category: string; technology: string }[]>().notNull().default([]),
     GoLiveDate: date("GoLiveDate", { mode: "string" }),
     // Low, Medium, atau High (lihat features/projects/data/priorities.ts).
     Priority: varchar("Priority", { length: 10 }).notNull().default("Medium"),
@@ -114,6 +117,62 @@ export const dataIssueActivity = pgTable("DATA_IssueActivity", {
   Detail: text("Detail").notNull().default(""),
   ...auditColumns,
 });
+
+export const dataServiceRequests = pgTable("DATA_ServiceRequests", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  NewId: uuid("NewId").notNull().defaultRandom().unique(),
+  RequestNumber: varchar("RequestNumber", { length: 20 }).notNull().unique(),
+  Title: varchar("Title", { length: 255 }).notNull().default(""),
+  Description: text("Description").notNull().default(""),
+  Type: varchar("Type", { length: 40 }).notNull().default("Lainnya"),
+  Priority: varchar("Priority", { length: 20 }).notNull().default("Medium"),
+  ProjectId: integer("ProjectId").references(() => dataProjects.Id, { onDelete: "set null" }),
+  RequesterId: integer("RequesterId").references(() => coreUser.Id, { onDelete: "set null" }),
+  PICId: integer("PICId").references(() => coreUser.Id, { onDelete: "set null" }),
+  BusinessJustification: text("BusinessJustification").notNull().default(""),
+  RequestedTargetDate: date("RequestedTargetDate", { mode: "string" }),
+  EstimatedEffort: varchar("EstimatedEffort", { length: 100 }).notNull().default(""),
+  Status: varchar("Status", { length: 30 }).notNull().default("Draft"),
+  ReviewComment: text("ReviewComment").notNull().default(""),
+  ...auditColumns,
+});
+
+export const dataServiceRequestComments = pgTable("DATA_ServiceRequestComments", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  ServiceRequestId: integer("ServiceRequestId").notNull().references(() => dataServiceRequests.Id, { onDelete: "cascade" }),
+  ParentCommentId: integer("ParentCommentId"),
+  AuthorId: integer("AuthorId").references(() => coreUser.Id, { onDelete: "set null" }),
+  Author: varchar("Author", { length: 150 }).notNull(),
+  Body: text("Body").notNull(),
+  ...auditColumns,
+});
+
+export const dataServiceRequestActivities = pgTable("DATA_ServiceRequestActivities", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  ServiceRequestId: integer("ServiceRequestId").notNull().references(() => dataServiceRequests.Id, { onDelete: "cascade" }),
+  Actor: varchar("Actor", { length: 150 }).notNull(),
+  Action: varchar("Action", { length: 100 }).notNull(),
+  Detail: text("Detail").notNull().default(""),
+  CreatedBy: varchar("CreatedBy", { length: 255 }),
+  CreatedDate: timestamp("CreatedDate", { mode: "string" }).notNull().defaultNow(),
+});
+
+export const dataServiceRequestAttachments = pgTable("DATA_ServiceRequestAttachments", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  ServiceRequestId: integer("ServiceRequestId").notNull().references(() => dataServiceRequests.Id, { onDelete: "cascade" }),
+  Name: varchar("Name", { length: 255 }).notNull(),
+  Size: integer("Size").notNull().default(0),
+  MimeType: varchar("MimeType", { length: 150 }).notNull().default(""),
+  Content: bytea("Content"),
+  ...auditColumns,
+});
+
+export const dataServiceRequestIssues = pgTable("DATA_ServiceRequestIssues", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  ServiceRequestId: integer("ServiceRequestId").notNull().references(() => dataServiceRequests.Id, { onDelete: "cascade" }),
+  IssueId: integer("IssueId").notNull().references(() => dataIssues.Id, { onDelete: "cascade" }),
+  ...auditColumns,
+}, (t) => [uniqueIndex("DATA_ServiceRequestIssues_ServiceRequestId_IssueId_key").on(t.ServiceRequestId, t.IssueId)]);
 
 export const dataKanban = pgTable("DATA_Kanban", {
   Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),

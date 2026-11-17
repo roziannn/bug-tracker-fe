@@ -37,6 +37,8 @@ function isValidUrl(value: string) {
 
 const DATE_MIN = "2000-01-01";
 const DATE_MAX = "2100-12-31";
+const TECH_STACK_CATEGORIES = ["Database", "Frontend", "Backend"] as const;
+type TechStackCategory = (typeof TECH_STACK_CATEGORIES)[number];
 
 // Salah satu isian phase yang kurang (hanya dicek setelah tombol Create ditekan).
 function missingField(phase: TimelinePhase): string | null {
@@ -64,6 +66,11 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
       ? project.Repositories.map((value, index) => ({ id: `repo-${index}`, value }))
       : [{ id: "repo-0", value: "" }]
   );
+  const [techStack, setTechStack] = useState(() =>
+    project?.TechStack?.length
+      ? project.TechStack.map((item, index) => ({ id: `stack-${index}`, category: item.category as TechStackCategory, technology: item.technology }))
+      : []
+  );
   const [goLiveDate, setGoLiveDate] = useState(project?.GoLiveDate ?? "");
   const [description, setDescription] = useState(project?.Description ?? "");
   const [priority, setPriority] = useState<ProjectPriority>(
@@ -86,6 +93,7 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
   );
   const nextPhaseId = useRef(project?.Phases.length ?? 0);
   const nextRepositoryId = useRef(Math.max(1, project?.Repositories.length ?? 1));
+  const nextTechStackId = useRef(Math.max(1, project?.TechStack?.length ?? 1));
 
   // null = masih dimuat
   const [users, setUsers] = useState<User[] | null>(null);
@@ -170,6 +178,18 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
     });
   }
 
+  function addTechStack() {
+    setTechStack((current) => [...current, { id: `stack-${nextTechStackId.current++}`, category: "Database", technology: "" }]);
+  }
+
+  function updateTechStack(id: string, patch: Partial<{ category: TechStackCategory; technology: string }>) {
+    setTechStack((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+  function removeTechStack(id: string) {
+    setTechStack((current) => current.filter((item) => item.id !== id));
+  }
+
   function addPhase() {
     // Phase baru dimulai sehari setelah phase sebelumnya selesai.
     const lastEnd = phases.length ? parseDateOnly(phases[phases.length - 1].end) : null;
@@ -211,6 +231,7 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
           goLiveDate,
           tags: (tagOptions ?? []).filter((tag) => tags.includes(tag.Name)).map((tag) => tag.Id),
           repositories: repositories.map((item) => item.value.trim()).filter(Boolean),
+          techStack: techStack.filter((item) => item.technology.trim()).map(({ category, technology }) => ({ category, technology: technology.trim() })),
           environments: Object.fromEntries(
             Object.entries(urls)
               .map(([environment, url]) => [environment, url.trim()])
@@ -501,6 +522,42 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
               <Button type="button" variant="outline" onClick={addRepository}>
                 <Plus />
                 Add repository
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tech Stack</CardTitle>
+            <CardDescription>Add the technologies used for the database, frontend, or backend.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {techStack.map((item, index) => (
+              <div key={item.id} className="grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
+                <select
+                  aria-label={`Tech stack category ${index + 1}`}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  value={item.category}
+                  onChange={(event) => updateTechStack(item.id, { category: event.target.value as TechStackCategory })}
+                >
+                  {TECH_STACK_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+                </select>
+                <Input
+                  aria-label={`${item.category} technology ${index + 1}`}
+                  placeholder={item.category === "Database" ? "Neon, PostgreSQL..." : item.category === "Frontend" ? "Next.js, React..." : "Node.js, .NET..."}
+                  value={item.technology}
+                  maxLength={100}
+                  onChange={(event) => updateTechStack(item.id, { technology: event.target.value })}
+                />
+                <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${item.category} technology ${index + 1}`} onClick={() => removeTechStack(item.id)}>
+                  <Trash2 />
+                </Button>
+              </div>
+            ))}
+            <div>
+              <Button type="button" variant="outline" onClick={addTechStack}>
+                <Plus /> Add technology
               </Button>
             </div>
           </CardContent>

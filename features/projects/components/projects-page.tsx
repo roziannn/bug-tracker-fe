@@ -186,37 +186,6 @@ const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
       }
     >
       <div className="min-w-0 space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {highlights.map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <Card key={item.label} className="h-full">
-                <CardHeader className="h-full">
-                  <div className="flex h-full items-start justify-between gap-4">
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <CardDescription className="truncate font-semibold">{item.label}</CardDescription>
-                      <CardDescription className="mt-1 truncate">{item.note}</CardDescription>
-
-                      <div className="mt-3 flex items-center gap-3">
-                        {item.value === undefined ? (
-                          <Skeleton className="h-9 w-12" aria-hidden="true" />
-                        ) : (
-                          <CardTitle className="text-4xl leading-none">{item.value}</CardTitle>
-                        )}
-                      </div>
-                    </div>
-
-                    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <Icon className="size-5" />
-                    </span>
-                  </div>
-                </CardHeader>
-              </Card>
-            );
-          })}
-        </div>
-
         <Card>
           <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 space-y-1.5">
@@ -224,11 +193,11 @@ const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
               <CardDescription>Every project with its owner, current status, go-live date, and timeline.</CardDescription>
             </div>
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
-              <div className="flex w-full min-w-0 items-center gap-2 rounded-xl border bg-card px-3 sm:w-auto sm:min-w-56">
+              <div className="flex w-full min-w-0 items-center gap-2 rounded-xl border px-3 sm:w-auto sm:min-w-56">
                 <Search className="size-4 text-muted-foreground" />
                 <Input
                   aria-label="Search projects"
-                  className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                  className="border-0 px-0 shadow-none focus-visible:ring-0"
                   onChange={(event) => {
                     setSearchQuery(event.target.value);
                     setPage(1);

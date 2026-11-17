@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, Flag, Gauge, Hash, Link2, Pencil, Server, Tag, UserRound } from "lucide-react";
+import { ArrowLeft, CalendarDays, Flag, Gauge, Hash, Layers, Link2, Pencil, Server, Tag, UserRound } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -293,6 +293,30 @@ export function ProjectDetailPage({ id }: { id: string }) {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tech Stack</CardTitle>
+            <CardDescription>Technologies used by this project.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {project.TechStack?.length ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {project.TechStack.map((item, index) => (
+                  <div key={`${item.category}-${item.technology}-${index}`} className="flex items-start gap-3 rounded-lg border p-3">
+                    <Layers className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-muted-foreground">{item.category}</p>
+                      <p className="break-words text-sm font-medium">{item.technology}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No tech stack added. Use Edit to add the project database, frontend, and backend.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );

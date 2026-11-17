@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RichTextEditor, sanitizeRichText } from "@/components/ui/rich-text-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CredentialConfirmDialog } from "@/components/shared/credential-confirm-dialog";
@@ -18,6 +19,16 @@ import type { Paged, User } from "@/types";
 
 const rupiahNumberFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
 const rupiahCurrencyFormat = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
+
+// Style tab seragam. Garis bawah aktif ikut warna teks aktif (primary).
+// after:bottom-0! dipakai supaya garis tidak terpotong oleh wrapper overflow.
+const tabTriggerClass = [
+  "h-full flex-none cursor-pointer items-center justify-start gap-2 rounded-none px-1 text-sm font-medium",
+  "text-muted-foreground hover:text-foreground",
+  "data-active:bg-transparent data-active:text-primary data-active:shadow-none",
+  "after:inset-x-0 after:bottom-0! after:h-0.5 after:rounded-full after:bg-primary after:opacity-0 data-active:after:opacity-100",
+  "[&_svg]:size-4 [&_svg]:shrink-0",
+].join(" ");
 
 type IssueDetail = {
   id: string;
@@ -43,7 +54,7 @@ type IssueDetail = {
   activity: { id: number; actor: string; action: string; detail: string; createdAt: string }[];
 };
 
-function MentionText({ text, users }: { text: string; users: User[] }) {
+export function MentionText({ text, users }: { text: string; users: User[] }) {
   const names = users.map((user) => user.Name).filter(Boolean).sort((a, b) => b.length - a.length);
   if (!names.length) return <>{text}</>;
   const pattern = new RegExp(`(^|\\s)(@(?:${names.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?=[\\s.,!?;:]|$))`, "gu");
@@ -61,7 +72,7 @@ function MentionText({ text, users }: { text: string; users: User[] }) {
   return <>{content}</>;
 }
 
-function MentionTextarea({ value, onChange, users, placeholder, className, autoFocus, maxLength = 5000 }: {
+export function MentionTextarea({ value, onChange, users, placeholder, className, autoFocus, maxLength = 5000 }: {
   value: string;
   onChange: (value: string) => void;
   users: User[];
@@ -163,6 +174,7 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
   const [savingRootCause, setSavingRootCause] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [selectedEvidence, setSelectedEvidence] = useState<IssueDetail["evidence"][number] | null>(null);
 
   useEffect(() => {
     requestJson<Paged<User>>("/api/users?pageSize=100").then((result) => setUsers(result.data.filter((user) => user.IsActive))).catch(() => setUsers([]));
@@ -314,7 +326,7 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
       breadcrumbs={[{ label: "All Issues", href: "/issues" }, { label: issue?.id ?? "Issue detail" }]}
       eyebrow="Issue detail"
       title={issue?.id ?? "Issue detail"}
-      toolbar={<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-semibold tracking-tight">Issue details</h2><p className="text-sm text-muted-foreground">Issue report, assignment, and evidence.</p></div><div className="flex flex-wrap items-center gap-2">{issue && issue.status !== "Draft" ? <Button onClick={() => issue.status === "Done" ? toggleClosed() : setConfirmCloseOpen(true)} disabled={changingStatus} variant={issue.status === "Done" ? "outline" : "default"}>{issue.status === "Done" ? <RotateCcw /> : <CheckCircle2 />}{changingStatus ? "Updating..." : issue.status === "Done" ? "Re-open issue" : "Close issue"}</Button> : null}<Button nativeButton={false} render={<Link href="/issues" />} variant="outline"><ArrowLeft /> Back to issues</Button></div></div>}
+      toolbar={<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-semibold tracking-tight">Issue details</h2></div><div className="flex flex-wrap items-center gap-2">{issue && issue.status !== "Draft" ? <Button onClick={() => issue.status === "Done" ? toggleClosed() : setConfirmCloseOpen(true)} disabled={changingStatus} variant={issue.status === "Done" ? "outline" : "default"}>{issue.status === "Done" ? <RotateCcw /> : <CheckCircle2 />}{changingStatus ? "Updating..." : issue.status === "Done" ? "Re-open issue" : "Close issue"}</Button> : null}<Button nativeButton={false} render={<Link href="/issues" />} variant="outline"><ArrowLeft /> Back to issues</Button></div></div>}
     >
       {!loaded ? <Card><CardContent className="py-10 text-center text-muted-foreground">Loading issue...</CardContent></Card> : null}
       {loaded && !issue ? <Card><CardHeader><CardTitle>{loadError ? "Failed to load issue" : "Issue not found"}</CardTitle><CardDescription>{loadError ?? "Issue dengan ID tersebut tidak ditemukan."}</CardDescription></CardHeader></Card> : null}
@@ -331,18 +343,24 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
                 <section className="grid gap-4 border-t pt-4 sm:grid-cols-3"><div><p className="text-xs text-muted-foreground">Issue classification</p><p className="font-medium">{issue.classification || "—"}</p></div><div><p className="text-xs text-muted-foreground">PIC</p><p className="font-medium">{issue.pic || "—"}</p></div><div><p className="text-xs text-muted-foreground">Project</p><p className="font-medium">{issue.project || "—"}</p></div></section>
               </CardContent>
             </Card>
-          <Card className="lg:col-start-2 lg:row-start-1"><CardHeader><CardTitle>Evidence</CardTitle><CardDescription>{issue.evidence.length} attached file{issue.evidence.length === 1 ? "" : "s"}</CardDescription></CardHeader><CardContent className="space-y-3">{issue.evidence.length ? issue.evidence.map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center gap-3 rounded-lg border p-3"><FileText className="size-4 shrink-0 text-muted-foreground" /><div className="min-w-0"><p className="truncate text-sm font-medium">{file.name}</p><p className="text-xs text-muted-foreground">{fileSize(file.size)}</p></div></div>) : <p className="text-sm text-muted-foreground">No evidence attached.</p>}</CardContent></Card>
+          <Card className="lg:col-start-2 lg:row-start-1"><CardHeader><CardTitle>Evidence</CardTitle><CardDescription>{issue.evidence.length} attached file{issue.evidence.length === 1 ? "" : "s"}</CardDescription></CardHeader><CardContent className="space-y-3">{issue.evidence.length ? issue.evidence.map((file, index) => <button key={`${file.name}-${index}`} type="button" onClick={() => setSelectedEvidence(file)} className="flex w-full cursor-pointer items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><FileText className="size-4 shrink-0 text-muted-foreground" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{file.name}</p><p className="text-xs text-muted-foreground">{fileSize(file.size)}</p></div><span className="text-xs text-primary">Preview</span></button>) : <p className="text-sm text-muted-foreground">No evidence attached.</p>}</CardContent></Card>
           <Card className="gap-0 overflow-hidden py-0 lg:col-span-2">
             <Tabs defaultValue="root-cause" className="gap-0">
-                <CardHeader className="gap-4"><div className="overflow-x-auto pb-2"><TabsList variant="line" className="h-11 w-max min-w-full justify-start gap-4 rounded-none border-0 bg-transparent p-0">
-                  <TabsTrigger value="root-cause" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><Target />Root Cause</TabsTrigger>
-                  <TabsTrigger value="solution" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><Lightbulb />Solution</TabsTrigger>
-                  <TabsTrigger value="additional-info" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><Info />Additional Info</TabsTrigger>
-
-                  <TabsTrigger value="discussion" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><MessageSquare />Discussion<span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px]">{issue.comments.length}</span></TabsTrigger>
-                  <TabsTrigger value="activity" className="h-full flex-none cursor-pointer justify-start gap-2 rounded-none px-1 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary after:bg-primary after:opacity-0 data-active:after:opacity-100"><History />Activity</TabsTrigger>
-                </TabsList></div></CardHeader>
-                <CardContent className="pt-5">
+                <CardHeader className="gap-0 border-b px-5 py-3 pb-0">
+                  <div className="overflow-x-auto">
+                    <TabsList variant="line" className="h-12 w-max min-w-full items-stretch justify-start gap-6 rounded-none border-0 bg-transparent p-0">
+                      <TabsTrigger value="root-cause" className={tabTriggerClass}><Target />Root Cause</TabsTrigger>
+                      <TabsTrigger value="solution" className={tabTriggerClass}><Lightbulb />Solution</TabsTrigger>
+                      <TabsTrigger value="additional-info" className={tabTriggerClass}><Info />Additional Info</TabsTrigger>
+                      <TabsTrigger value="discussion" className={tabTriggerClass}>
+                        <MessageSquare />Discussion
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-medium leading-none text-muted-foreground">{issue.comments.length}</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="activity" className={tabTriggerClass}><History />Activity</TabsTrigger>
+                    </TabsList>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-5 pb-5">
                   <TabsContent value="solution" className="space-y-4">
                     {issue.solution.trim() && !editingSolution ? <div className="rounded-xl border bg-muted/20 p-4 sm:p-5"><div className="solution-content text-sm leading-6 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeRichText(solution) }} /><div className="mt-4 flex justify-end border-t pt-3"><Button size="sm" variant="outline" onClick={() => setEditingSolution(true)}><Pencil /> Edit solution</Button></div></div> : <div className="space-y-3"><RichTextEditor value={solution} onChange={setSolution} placeholder="Describe the resolution, workaround, or proposed fix..." /><div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3"><span className="text-xs text-muted-foreground">Bold, italic, lists, code blocks, and images up to 1 MB</span><div className="flex gap-2">{issue.solution.trim() ? <Button size="sm" variant="outline" onClick={() => { setSolution(issue.solution); setEditingSolution(false); }} disabled={savingSolution}>Cancel</Button> : null}<Button size="sm" onClick={saveSolution} disabled={savingSolution}>{savingSolution ? "Saving..." : "Save solution"}</Button></div></div></div>}
                   </TabsContent>
@@ -421,6 +439,21 @@ export function DatabaseIssueDetailPage({ id }: { id: string }) {
           </Card>
         </div>
       ) : null}
+      <Dialog open={Boolean(selectedEvidence)} onOpenChange={(open) => !open && setSelectedEvidence(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{selectedEvidence?.name ?? "Evidence preview"}</DialogTitle>
+            <DialogDescription>{selectedEvidence ? `${fileSize(selectedEvidence.size)} · Evidence file` : "Preview evidence"}</DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/20 p-6 text-center">
+            <FileText className="size-10 text-muted-foreground" />
+            <div className="max-w-md space-y-1">
+              <p className="text-sm font-medium">File preview is unavailable</p>
+              <p className="text-sm text-muted-foreground">This issue currently stores the evidence filename and size only. The original file is not available to display.</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <CredentialConfirmDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen} actionLabel="Close issue" onVerified={toggleClosed} />
     </AppShell>
   );

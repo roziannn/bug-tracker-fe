@@ -127,6 +127,20 @@
                         "when":  1794370000000,
                         "tag":  "0018_issue_additional_info_saved",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  18,
+                        "version":  "7",
+                        "when":  1794370100000,
+                        "tag":  "0019_project_tech_stack",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  19,
+                        "version": "7",
+                        "when": 1794370200000,
+                        "tag": "0020_service_requests",
+                        "breakpoints": true
                     }
                 ]
 }

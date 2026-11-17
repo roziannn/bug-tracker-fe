@@ -8,7 +8,7 @@ import type { Project, ProjectDetail } from "@/types";
 const TAG_CATEGORY = getCategoryConfig("teams-domain")!.title;
 
 // Kolom date dikirim sebagai teks "YYYY-MM-DD" supaya tidak bergeser karena zona waktu.
-const PROJECT_COLUMNS = `p."Id", p."NewId", p."Name", p."OwnerId", u."Name" AS "OwnerName", p."Description", p."Priority",
+const PROJECT_COLUMNS = `p."Id", p."NewId", p."Name", p."OwnerId", u."Name" AS "OwnerName", p."Description", p."Priority", p."TechStack",
   p."GoLiveDate"::text AS "GoLiveDate", p."IsActive", p."CreatedBy", p."CreatedDate", p."UpdatedBy", p."UpdatedDate"`;
 
 export async function getProjects(): Promise<Project[]> {
@@ -82,6 +82,7 @@ function normalizeChildren(input: CreateProjectInput) {
       .map(([environment, url]) => [environment.trim(), url.trim()] as const)
       .filter(([, url]) => url !== ""),
     tagIds: Array.from(new Set(input.tags)),
+    techStack: input.techStack.map((item) => ({ category: item.category, technology: item.technology.trim() })).filter((item) => item.technology),
   };
 }
 
@@ -177,10 +178,10 @@ export async function createProject(input: CreateProjectInput, createdBy: string
     if (problem) return { error: problem };
 
     const created = await client.query<{ Id: number; NewId: string }>(
-      `INSERT INTO "DATA_Projects" ("Name", "OwnerId", "Description", "Priority", "GoLiveDate", "CreatedBy", "CreatedDate")
-       VALUES ($1, $2, $3, $4, $5, $6, now())
+      `INSERT INTO "DATA_Projects" ("Name", "OwnerId", "Description", "Priority", "GoLiveDate", "TechStack", "CreatedBy", "CreatedDate")
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, now())
        RETURNING "Id", "NewId"`,
-      [input.name, input.ownerId, input.description, input.priority, input.goLiveDate || null, createdBy]
+      [input.name, input.ownerId, input.description, input.priority, input.goLiveDate || null, JSON.stringify(children.techStack), createdBy]
     );
 
     await insertChildren(client, created.rows[0].Id, input, children, createdBy);
@@ -202,9 +203,9 @@ export async function updateProject(newId: string, input: CreateProjectInput, up
 
     await client.query(
       `UPDATE "DATA_Projects"
-       SET "Name" = $1, "OwnerId" = $2, "Description" = $3, "Priority" = $4, "GoLiveDate" = $5, "UpdatedBy" = $6, "UpdatedDate" = now()
-       WHERE "Id" = $7`,
-      [input.name, input.ownerId, input.description, input.priority, input.goLiveDate || null, updatedBy, projectId]
+       SET "Name" = $1, "OwnerId" = $2, "Description" = $3, "Priority" = $4, "GoLiveDate" = $5, "TechStack" = $6::jsonb, "UpdatedBy" = $7, "UpdatedDate" = now()
+       WHERE "Id" = $8`,
+      [input.name, input.ownerId, input.description, input.priority, input.goLiveDate || null, JSON.stringify(children.techStack), updatedBy, projectId]
     );
 
     for (const table of ["DATA_ProjectPhases", "DATA_ProjectTags", "DATA_ProjectRepositories", "DATA_ProjectEnvironments"]) {

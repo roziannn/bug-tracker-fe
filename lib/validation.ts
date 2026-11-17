@@ -122,6 +122,10 @@ export const createProjectSchema = z
       .refine((value) => value === "" || parseDateOnly(value) !== null, "Go Live date is invalid"),
     tags: z.array(z.number().int().positive()).max(50, "Too many tags").default([]),
     repositories: z.array(z.string().trim().max(255, "Repository must be at most 255 characters")).max(50, "Too many repositories").default([]),
+    techStack: z.array(z.object({
+      category: z.enum(["Database", "Frontend", "Backend"]),
+      technology: z.string().trim().min(1, "Technology is required").max(100, "Technology must be at most 100 characters"),
+    })).max(30, "Too many technologies").default([]),
     environments: z.record(z.string(), z.string()).default({}),
     phases: z
       .array(

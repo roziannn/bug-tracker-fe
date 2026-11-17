@@ -22,6 +22,7 @@ const rootMenus = [
       { id: "issues.export", label: "Export" },
     ],
   },
+  { id: "service-requests", path: "/service-requests", icon: "ClipboardList", label: "Service Requests", actions: [{ id: "service-requests.create", label: "Create request" }, { id: "service-requests.review", label: "Review request" }, { id: "service-requests.comment", label: "Comment" }] },
   { id: "kanban", path: "/kanban", icon: "KanbanSquare", label: "Kanban", actions: [{ id: "kanban.move", label: "Move card" }] },
   {
     id: "teams", path: "/teams", icon: "Users",

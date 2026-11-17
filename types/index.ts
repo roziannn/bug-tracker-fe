@@ -120,6 +120,7 @@ export interface ProjectDetail extends AuditFields {
   Tags: { Id: number; Name: string }[];
   Phases: ProjectPhase[];
   Repositories: string[];
+  TechStack: { category: string; technology: string }[];
   Environments: { Environment: string; Url: string }[];
 }
 
