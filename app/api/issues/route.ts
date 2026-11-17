@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { fail, handleError, ok } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { query } from "@/lib/db";
+import { sendBugNotification } from "@/lib/services/email.service";
 import { addIssueActivity } from "@/repositories/issue-activity.repository";
 
 export const dynamic = "force-dynamic";
@@ -115,6 +116,9 @@ export async function POST(req: NextRequest) {
       if (updated[0]) {
         const action = previous[0].Status === "Draft" && status !== "Draft" ? "Issue submitted" : status === "Draft" ? "Draft saved" : "Issue updated";
         await addIssueActivity(updated[0].Id, actor, action, title || "Issue details updated");
+        if (previous[0].Status === "Draft" && status !== "Draft") {
+          await notifyIssue(updated[0].NewId, title, description, body.criticality ?? "Tier 2 - Major", status, actor, picId);
+        }
       }
       return updated[0] ? ok(updated[0]) : fail("Draft not found", 404);
     }
@@ -125,8 +129,46 @@ export async function POST(req: NextRequest) {
       [title, description, status, classificationId, body.criticality ?? "Tier 2 - Major", picId, projectId, JSON.stringify(evidence), createdBy]
     );
     await addIssueActivity(created[0].Id, actor, status === "Draft" ? "Draft created" : "Issue submitted", title || "Issue created");
+    if (status !== "Draft") {
+      await notifyIssue(created[0].NewId, title, description, body.criticality ?? "Tier 2 - Major", status, actor, picId);
+    }
     return ok(created[0], 201);
   } catch (err) {
     return handleError(err);
+  }
+}
+
+async function notifyIssue(
+  newId: string,
+  title: string,
+  description: string,
+  priority: string,
+  status: string,
+  reportedBy: string,
+  picId: number | null,
+) {
+  if (!picId) return;
+
+  try {
+    const recipients = await query<{ Name: string; Email: string }>(
+      `SELECT "Name", "Email" FROM "CORE_User" WHERE "Id" = $1 AND "IsActive" = true`,
+      [picId],
+    );
+    const recipient = recipients[0];
+    if (!recipient?.Email) return;
+
+    await sendBugNotification(recipient.Email, {
+      bugId: newId,
+      title,
+      description,
+      priority,
+      status,
+      reportedBy,
+      assignedTo: recipient.Name,
+      bugUrl: `https://bugtracker-frt.vercel.app/issues/${encodeURIComponent(newId)}`,
+    });
+  } catch (error) {
+    // Email delivery is best effort: a mail provider failure must not undo a saved issue.
+    console.error(`Failed to send issue notification for ${newId}`, error);
   }
 }
