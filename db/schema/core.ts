@@ -1,5 +1,5 @@
 // Tabel master / settings: prefix CORE_
-import { boolean, integer, pgTable, text, uuid, varchar, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, text, timestamp, uuid, varchar, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { auditColumns } from "./_columns";
 
 export const coreRole = pgTable("CORE_Role", {
@@ -117,6 +117,17 @@ export const coreDatabaseServer = pgTable(
   },
   (t) => [uniqueIndex("CORE_DatabaseServer_Name_key").on(t.Name)]
 );
+
+export const dataNotification = pgTable("DATA_Notifications", {
+  Id: integer("Id").primaryKey().generatedAlwaysAsIdentity(),
+  UserId: integer("UserId").notNull().references(() => coreUser.Id, { onDelete: "cascade" }),
+  IssueId: varchar("IssueId", { length: 100 }).notNull(),
+  Title: varchar("Title", { length: 255 }).notNull(),
+  Description: text("Description").notNull().default(""),
+  Href: varchar("Href", { length: 500 }).notNull(),
+  IsRead: boolean("IsRead").notNull().default(false),
+  CreatedDate: timestamp("CreatedDate").notNull().defaultNow(),
+}, (table) => [index("DATA_Notifications_UserId_CreatedDate_idx").on(table.UserId, table.CreatedDate)]);
 
 // Nilai-nilai kategori (Settings → Categories). CategoryName = nama kategorinya (mis. "Audit Trail Outcome"),
 // Name = salah satu nilainya (mis. "Success"). Satu nilai satu baris.

@@ -150,8 +150,8 @@ async function notifyIssue(
   if (!picId) return;
 
   try {
-    const recipients = await query<{ Name: string; Email: string }>(
-      `SELECT "Name", "Email" FROM "CORE_User" WHERE "Id" = $1 AND "IsActive" = true`,
+    const recipients = await query<{ Id: number; Name: string; Email: string }>(
+      `SELECT "Id", "Name", "Email" FROM "CORE_User" WHERE "Id" = $1 AND "IsActive" = true`,
       [picId],
     );
     const recipient = recipients[0];
@@ -167,6 +167,11 @@ async function notifyIssue(
       assignedTo: recipient.Name,
       bugUrl: `https://bugtracker-frt.vercel.app/issues/${encodeURIComponent(newId)}`,
     });
+    await query(
+      `INSERT INTO "DATA_Notifications" ("UserId", "IssueId", "Title", "Description", "Href")
+       VALUES ($1, $2, $3, $4, $5)`,
+      [recipient.Id, newId, `Issue baru ditugaskan: ${newId}`, title || description, `/issues/${encodeURIComponent(newId)}`],
+    );
   } catch (error) {
     // Email delivery is best effort: a mail provider failure must not undo a saved issue.
     console.error(`Failed to send issue notification for ${newId}`, error);

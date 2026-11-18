@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Activity, Database, HardDrive, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Activity, Database, HardDrive, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { appToast } from "@/lib/app-toast";
 import { requestJson } from "@/lib/request";
 
@@ -43,12 +44,9 @@ export function DatabaseMonitorPage() {
   const [provider, setProvider] = useState("neon");
   const [connectionString, setConnectionString] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editProvider, setEditProvider] = useState("neon");
-  const [editConnectionString, setEditConnectionString] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadServers = useCallback(async (quiet = false) => {
@@ -72,17 +70,35 @@ export function DatabaseMonitorPage() {
     return () => window.clearInterval(timer);
   }, [loadServers]);
 
-  async function addServer(event: FormEvent<HTMLFormElement>) {
+  function resetForm() {
+    setEditingId(null);
+    setName("");
+    setProvider("neon");
+    setConnectionString("");
+  }
+
+  function openCreateDialog() {
+    resetForm();
+    setDialogOpen(true);
+  }
+
+  async function saveServer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const isEditing = editingId !== null;
     setSaving(true);
     try {
-      await requestJson("/api/database-monitor", "POST", { name, provider, connectionString });
-      setName("");
-      setConnectionString("");
-      appToast.success({ title: "Database berhasil ditambahkan", description: "Koneksi berhasil diuji dan masuk ke monitor." });
+      if (editingId) {
+        await requestJson(`/api/database-monitor/${encodeURIComponent(editingId)}`, "PUT", { name, provider, connectionString });
+        appToast.success({ title: "Database berhasil diperbarui" });
+      } else {
+        await requestJson("/api/database-monitor", "POST", { name, provider, connectionString });
+        appToast.success({ title: "Database berhasil ditambahkan", description: "Koneksi berhasil diuji dan masuk ke monitor." });
+      }
+      setDialogOpen(false);
+      resetForm();
       await loadServers(true);
     } catch (error) {
-      appToast.error({ title: "Gagal menambahkan database", description: error instanceof Error ? error.message : undefined });
+      appToast.error({ title: isEditing ? "Gagal memperbarui database" : "Gagal menambahkan database", description: error instanceof Error ? error.message : undefined });
     } finally {
       setSaving(false);
     }
@@ -101,29 +117,10 @@ export function DatabaseMonitorPage() {
 
   function beginEdit(server: MonitoredDatabase) {
     setEditingId(server.id);
-    setEditName(server.name);
-    setEditProvider(server.provider);
-    setEditConnectionString("");
-  }
-
-  async function saveServer(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editingId) return;
-    setSavingEdit(true);
-    try {
-      await requestJson(`/api/database-monitor/${encodeURIComponent(editingId)}`, "PUT", {
-        name: editName,
-        provider: editProvider,
-        connectionString: editConnectionString,
-      });
-      setEditingId(null);
-      appToast.success({ title: "Database berhasil diperbarui" });
-      await loadServers(true);
-    } catch (error) {
-      appToast.error({ title: "Gagal memperbarui database", description: error instanceof Error ? error.message : undefined });
-    } finally {
-      setSavingEdit(false);
-    }
+    setName(server.name);
+    setProvider(server.provider);
+    setConnectionString("");
+    setDialogOpen(true);
   }
 
   const onlineCount = servers.filter((server) => server.status === "online").length;
@@ -137,35 +134,28 @@ export function DatabaseMonitorPage() {
           <Card><CardContent className="flex items-center gap-3 p-5"><HardDrive className="size-5 text-muted-foreground" /><div><p className="text-sm text-muted-foreground">Offline</p><p className="text-2xl font-semibold">{servers.length - onlineCount}</p></div></CardContent></Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Tambahkan database</CardTitle>
-            <CardDescription>Daftarkan PostgreSQL dari Neon, Supabase, atau server PostgreSQL lain.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="grid gap-4 md:grid-cols-2" onSubmit={addServer}>
-              <div className="grid gap-2"><Label htmlFor="database-name">Nama server</Label><Input id="database-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Contoh: Neon Production" maxLength={100} required /></div>
-              <div className="grid gap-2"><Label htmlFor="database-provider">Provider</Label><select id="database-provider" value={provider} onChange={(event) => setProvider(event.target.value)} className="h-9 rounded-lg border border-input bg-background px-3 text-sm"><option value="neon">Neon</option><option value="supabase">Supabase</option><option value="postgresql">PostgreSQL / Local</option></select></div>
-              <div className="grid gap-2 md:col-span-2"><Label htmlFor="database-url">Connection URL</Label><Input id="database-url" type="password" autoComplete="new-password" value={connectionString} onChange={(event) => setConnectionString(event.target.value)} placeholder="postgresql://user:password@host:5432/database?sslmode=require" required /><p className="text-xs text-muted-foreground">URL dienkripsi sebelum disimpan. Gunakan kredensial read-only bila tersedia.</p></div>
-              <div className="md:col-span-2"><Button disabled={saving || !name.trim() || !connectionString.trim()} type="submit"><Plus />{saving ? "Menguji koneksi..." : "Tambah database"}</Button></div>
-            </form>
-          </CardContent>
-        </Card>
-
-        {editingId ? <Card>
-          <CardHeader><div className="flex items-start justify-between gap-4"><div><CardTitle>Edit database</CardTitle><CardDescription>Connection URL dikosongkan berarti URL yang tersimpan tetap digunakan.</CardDescription></div><Button type="button" size="icon-sm" variant="ghost" aria-label="Tutup edit" onClick={() => setEditingId(null)}><X /></Button></div></CardHeader>
-          <CardContent><form className="grid gap-4 md:grid-cols-2" onSubmit={saveServer}>
-            <div className="grid gap-2"><Label htmlFor="edit-database-name">Nama server</Label><Input id="edit-database-name" value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={100} required /></div>
-            <div className="grid gap-2"><Label htmlFor="edit-database-provider">Provider</Label><select id="edit-database-provider" value={editProvider} onChange={(event) => setEditProvider(event.target.value)} className="h-9 rounded-lg border border-input bg-background px-3 text-sm"><option value="neon">Neon</option><option value="supabase">Supabase</option><option value="postgresql">PostgreSQL / Local</option></select></div>
-            <div className="grid gap-2 md:col-span-2"><Label htmlFor="edit-database-url">Connection URL baru (opsional)</Label><Input id="edit-database-url" type="password" autoComplete="new-password" value={editConnectionString} onChange={(event) => setEditConnectionString(event.target.value)} placeholder="Kosongkan untuk mempertahankan URL saat ini" /></div>
-            <div className="flex gap-2 md:col-span-2"><Button type="submit" disabled={savingEdit || !editName.trim()}>{savingEdit ? "Menyimpan..." : "Simpan perubahan"}</Button><Button type="button" variant="outline" onClick={() => setEditingId(null)}>Batal</Button></div>
-          </form></CardContent>
-        </Card> : null}
-
         <div className="flex items-center justify-between gap-3">
           <div><h2 className="text-lg font-semibold">Server terpantau</h2><p className="text-sm text-muted-foreground">Status dan metrik diperbarui otomatis setiap 30 detik.</p></div>
-          <Button type="button" variant="outline" onClick={() => void loadServers(true)} disabled={refreshing}><RefreshCw className={refreshing ? "animate-spin" : ""} />Refresh</Button>
+          <div className="flex items-center gap-2"><Button type="button" onClick={openCreateDialog}><Plus />Tambah database</Button><Button type="button" variant="outline" onClick={() => void loadServers(true)} disabled={refreshing}><RefreshCw className={refreshing ? "animate-spin" : ""} />Refresh</Button></div>
         </div>
+
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{editingId ? "Edit database" : "Tambahkan database"}</DialogTitle>
+              <DialogDescription>{editingId ? "Connection URL dikosongkan berarti URL yang tersimpan tetap digunakan." : "Daftarkan PostgreSQL dari Neon, Supabase, atau server PostgreSQL lain."}</DialogDescription>
+            </DialogHeader>
+            <form id="database-monitor-form" className="grid gap-4" onSubmit={saveServer}>
+              <div className="grid gap-2"><Label htmlFor="database-name">Nama server</Label><Input id="database-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Contoh: Neon Production" maxLength={100} required /></div>
+              <div className="grid gap-2"><Label htmlFor="database-provider">Provider</Label><select id="database-provider" value={provider} onChange={(event) => setProvider(event.target.value)} className="h-9 rounded-lg border border-input bg-background px-3 text-sm"><option value="neon">Neon</option><option value="supabase">Supabase</option><option value="postgresql">PostgreSQL / Local</option></select></div>
+              <div className="grid gap-2"><Label htmlFor="database-url">Connection URL{editingId ? " baru (opsional)" : ""}</Label><Input id="database-url" type="password" autoComplete="new-password" value={connectionString} onChange={(event) => setConnectionString(event.target.value)} placeholder={editingId ? "Kosongkan untuk mempertahankan URL saat ini" : "postgresql://user:password@host:5432/database?sslmode=require"} required={!editingId} />{!editingId ? <p className="text-xs text-muted-foreground">URL dienkripsi sebelum disimpan. Gunakan kredensial read-only bila tersedia.</p> : null}</div>
+            </form>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Batal</Button>
+              <Button type="submit" form="database-monitor-form" disabled={saving || !name.trim() || (!editingId && !connectionString.trim())}>{saving ? (editingId ? "Menyimpan..." : "Menguji koneksi...") : (editingId ? "Simpan perubahan" : "Tambah database")}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {loading ? <p className="text-sm text-muted-foreground">Memuat status server...</p> : servers.length === 0 ? (
           <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Belum ada database. Tambahkan koneksi untuk mulai memantau.</CardContent></Card>
