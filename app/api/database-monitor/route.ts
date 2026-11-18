@@ -25,33 +25,22 @@ export async function GET() {
     const session = await authorizedRoleId();
     if (!session) return fail("Unauthorized", 401);
     assertDatabaseMonitorConfigured();
-    const servers = await query<{ Id: number; NewId: string; Name: string; Provider: string; ConnectionSecret: string }>(
-      `SELECT "Id", "NewId", "Name", "Provider", "ConnectionSecret" FROM "CORE_DatabaseServer" WHERE "IsActive" = true ORDER BY "Name"`,
+    const servers = await query<{ Id: number; NewId: string; Name: string; Provider: string; LoginMethod: string; LoginAccount: string; ConnectionSecret: string }>(
+      `SELECT "Id", "NewId", "Name", "Provider", "LoginMethod", "LoginAccount", "ConnectionSecret" FROM "CORE_DatabaseServer" WHERE "IsActive" = true ORDER BY "Name"`,
     );
     const results = await Promise.all(servers.map(async (server) => {
       try {
         const metrics = await inspectDatabase(decryptConnectionString(server.ConnectionSecret));
-        return { id: server.NewId, name: server.Name, provider: server.Provider, ...metrics };
+        return { id: server.NewId, name: server.Name, provider: server.Provider, loginMethod: server.LoginMethod, loginAccount: server.LoginAccount, ...metrics };
       } catch (error) {
         console.error(`Database monitor failed for ${server.Name}`, error);
         return {
-          id: server.NewId, name: server.Name, provider: server.Provider, status: "offline" as const,
+          id: server.NewId, name: server.Name, provider: server.Provider, loginMethod: server.LoginMethod, loginAccount: server.LoginAccount, status: "offline" as const,
           latencyMs: null, databaseName: null, serverVersion: null, activeConnections: null,
           maxConnections: null, sizeBytes: null, checkedAt: new Date().toISOString(),
         };
       }
     }));
-    const applicationDatabaseUrl = process.env.DATABASE_URL;
-    if (applicationDatabaseUrl) {
-      try {
-        const metrics = await inspectDatabase(applicationDatabaseUrl);
-        const host = new URL(applicationDatabaseUrl).hostname.toLowerCase();
-        const provider = host.includes("neon") ? "neon" : host.includes("supabase") ? "supabase" : "postgresql";
-        results.unshift({ id: "application-database", name: "Application Database", provider, ...metrics });
-      } catch (error) {
-        console.error("Unable to inspect application database", error);
-      }
-    }
     await query(`DELETE FROM "DATA_DatabaseMonitorSamples" WHERE "CheckedDate" < now() - interval '24 hours'`);
     await Promise.all(results.map((server) => query(
       `INSERT INTO "DATA_DatabaseMonitorSamples" ("ServerKey", "Status", "LatencyMs", "CheckedDate")
@@ -84,11 +73,16 @@ export async function POST(req: NextRequest) {
     const session = await authorizedRoleId();
     if (!session) return fail("Unauthorized", 401);
     assertDatabaseMonitorConfigured();
-    const body = await req.json().catch(() => null) as { name?: unknown; provider?: unknown; connectionString?: unknown } | null;
+    const body = await req.json().catch(() => null) as { name?: unknown; provider?: unknown; loginMethod?: unknown; loginAccount?: unknown; connectionString?: unknown } | null;
     const name = typeof body?.name === "string" ? body.name.trim() : "";
     const provider = typeof body?.provider === "string" ? body.provider : "";
+    const loginMethod = typeof body?.loginMethod === "string" ? body.loginMethod : "";
+    const loginAccount = typeof body?.loginAccount === "string" ? body.loginAccount.trim() : "";
     const connectionString = typeof body?.connectionString === "string" ? body.connectionString.trim() : "";
     if (!name || name.length > 100) return fail("Name is required and must be 100 characters or fewer", 400);
+    if (!["email", "github", "gitlab", "google", "other"].includes(loginMethod)) return fail("Select a login method", 400);
+    if (loginMethod === "email" && (!loginAccount || loginAccount.length > 255 || !/^\S+@\S+\.\S+$/.test(loginAccount))) return fail("Enter a valid account email", 400);
+    if (loginMethod !== "email" && loginAccount.length > 255) return fail("Connected account must be 255 characters or fewer", 400);
     if (!["neon", "supabase", "postgresql"].includes(provider)) return fail("Select a supported PostgreSQL provider", 400);
     let parsedUrl: URL;
     try {
@@ -110,11 +104,11 @@ export async function POST(req: NextRequest) {
     if (!metrics) return fail("Unable to connect. Check the URL, credentials, network access, and database permissions.", 400);
 
     const saved = await query<{ NewId: string }>(
-      `INSERT INTO "CORE_DatabaseServer" ("Name", "Provider", "ConnectionSecret", "CreatedBy", "CreatedDate")
-       VALUES ($1, $2, $3, $4, now()) RETURNING "NewId"`,
-      [name, provider, encryptConnectionString(connectionString), session.email],
+      `INSERT INTO "CORE_DatabaseServer" ("Name", "Provider", "LoginMethod", "LoginAccount", "ConnectionSecret", "CreatedBy", "CreatedDate")
+       VALUES ($1, $2, $3, $4, $5, $6, now()) RETURNING "NewId"`,
+      [name, provider, loginMethod, loginAccount, encryptConnectionString(connectionString), session.email],
     );
-    return ok({ id: saved[0].NewId, name, provider, ...metrics }, 201);
+    return ok({ id: saved[0].NewId, name, provider, loginMethod, loginAccount, ...metrics }, 201);
   } catch (error) {
     return handleError(error);
   }

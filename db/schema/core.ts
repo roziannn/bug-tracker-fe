@@ -112,6 +112,8 @@ export const coreDatabaseServer = pgTable(
     NewId: uuid("NewId").notNull().defaultRandom().unique(),
     Name: varchar("Name", { length: 100 }).notNull(),
     Provider: varchar("Provider", { length: 30 }).notNull(),
+    LoginMethod: varchar("LoginMethod", { length: 30 }).notNull().default("email"),
+    LoginAccount: varchar("LoginAccount", { length: 255 }).notNull().default(""),
     ConnectionSecret: text("ConnectionSecret").notNull(),
     ...auditColumns,
   },

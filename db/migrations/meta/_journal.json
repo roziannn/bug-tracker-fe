@@ -162,6 +162,20 @@
       "when": 1794973727300,
       "tag": "0023_freezing_iron_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795001000000,
+      "tag": "0024_database_server_account_note",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795002000000,
+      "tag": "0025_database_server_login_account",
+      "breakpoints": true
     }
   ]
 }

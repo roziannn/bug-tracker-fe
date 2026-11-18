@@ -5,7 +5,6 @@ import { CircleDot, GitBranch, ShieldAlert, Sparkles } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Label, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
@@ -71,6 +70,7 @@ type ActualIssueSummary = {
   status: string;
   team: string | null;
   pic: string | null;
+  project: string | null;
   criticality: string;
   resolvedAt: string | null;
 };
@@ -97,6 +97,7 @@ export function DashboardOverview() {
             typeof issue?.status === "string" &&
             (typeof issue?.team === "string" || issue?.team === null) &&
             (typeof issue?.pic === "string" || issue?.pic === null) &&
+            (typeof issue?.project === "string" || issue?.project === null) &&
             typeof issue?.criticality === "string" &&
             (typeof issue?.resolvedAt === "string" || issue?.resolvedAt === null),
           ));
@@ -405,14 +406,13 @@ export function DashboardOverview() {
                       <TableHead>Issue</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Team</TableHead>
-                      <TableHead>Assignee</TableHead>
+                      <TableHead>Project</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {!issuesLoading && paginatedWatchlist.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                           No urgent issues to display.
                         </TableCell>
                       </TableRow>
@@ -430,12 +430,7 @@ export function DashboardOverview() {
                         <TableCell>
                           <Badge variant={statusVariant(issue.status)}>{issue.status}</Badge>
                         </TableCell>
-                        <TableCell>{issue.team || "Unassigned"}</TableCell>
-                        <TableCell>
-                          <Avatar size="sm">
-                            <AvatarFallback>{issue.pic?.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "—"}</AvatarFallback>
-                          </Avatar>
-                        </TableCell>
+                        <TableCell>{issue.project || "No project"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

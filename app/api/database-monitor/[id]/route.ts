@@ -47,11 +47,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     assertDatabaseMonitorConfigured();
     const { id } = await params;
     if (!isGuid(id)) return fail("Invalid database server", 400);
-    const body = await req.json().catch(() => null) as { name?: unknown; provider?: unknown; connectionString?: unknown } | null;
+    const body = await req.json().catch(() => null) as { name?: unknown; provider?: unknown; loginMethod?: unknown; loginAccount?: unknown; connectionString?: unknown } | null;
     const name = typeof body?.name === "string" ? body.name.trim() : "";
     const provider = typeof body?.provider === "string" ? body.provider : "";
+    const loginMethod = typeof body?.loginMethod === "string" ? body.loginMethod : "";
+    const loginAccount = typeof body?.loginAccount === "string" ? body.loginAccount.trim() : "";
     const connectionString = typeof body?.connectionString === "string" ? body.connectionString.trim() : "";
     if (!name || name.length > 100) return fail("Name is required and must be 100 characters or fewer", 400);
+    if (!["email", "github", "gitlab", "google", "other"].includes(loginMethod)) return fail("Select a login method", 400);
+    if (loginMethod === "email" && (!loginAccount || loginAccount.length > 255 || !/^\S+@\S+\.\S+$/.test(loginAccount))) return fail("Enter a valid account email", 400);
+    if (loginMethod !== "email" && loginAccount.length > 255) return fail("Connected account must be 255 characters or fewer", 400);
     if (!["neon", "supabase", "postgresql"].includes(provider)) return fail("Select a supported PostgreSQL provider", 400);
 
     const existing = await query<{ Id: number }>(
@@ -80,10 +85,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     await query(
-      `UPDATE "CORE_DatabaseServer" SET "Name" = $2, "Provider" = $3,
-         "ConnectionSecret" = COALESCE($4, "ConnectionSecret"), "UpdatedBy" = $5, "UpdatedDate" = now()
+      `UPDATE "CORE_DatabaseServer" SET "Name" = $2, "Provider" = $3, "LoginMethod" = $4, "LoginAccount" = $5,
+         "ConnectionSecret" = COALESCE($6, "ConnectionSecret"), "UpdatedBy" = $7, "UpdatedDate" = now()
        WHERE "NewId" = $1::uuid`,
-      [id, name, provider, encryptedConnection, session.email],
+      [id, name, provider, loginMethod, loginAccount, encryptedConnection, session.email],
     );
     if (encryptedConnection) {
       await query(`DELETE FROM "DATA_DatabaseMonitorSamples" WHERE "ServerKey" = $1`, [id]);
