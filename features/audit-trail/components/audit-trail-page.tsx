@@ -71,7 +71,7 @@ export function AuditTrailPage({ initialEntries }: { initialEntries: AuditTrailE
 
       return matchesOutcome && matchesAction && matchesTeam && matchesSearch;
     });
-  }, [actionFilter, outcomeFilter, searchQuery, teamFilter]);
+  }, [auditTrailEntries, actionFilter, outcomeFilter, searchQuery, teamFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -205,7 +205,7 @@ export function AuditTrailPage({ initialEntries }: { initialEntries: AuditTrailE
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                      "No audit events match the current filters."
+                      &quot;No audit events match the current filters.&quot;
                     </TableCell>
                   </TableRow>
                 )}

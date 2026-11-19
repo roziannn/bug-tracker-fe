@@ -96,7 +96,9 @@ export function CreateIssuePage({ issueId: editIssueId }: { issueId?: string } =
   const [issueId, setIssueId] = useState<string | null>(editIssueId ?? null);
   const [savedStatus, setSavedStatus] = useState<"Draft" | "Backlog" | "Ready" | "Investigating" | "In review" | "Done">("Draft");
   const [loadingIssue, setLoadingIssue] = useState(Boolean(editIssueId));
-  const [savingIssue, setSavingIssue] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [submittingIssue, setSubmittingIssue] = useState(false);
+  const issueActionInProgress = savingDraft || submittingIssue;
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceUpload[]>([]);
   // run dinaikkan tiap tour dimulai ulang, supaya selalu mulai dari langkah pertama.
   const [tour, setTour] = useState({ open: false, run: 0 });
@@ -214,8 +216,8 @@ export function CreateIssuePage({ issueId: editIssueId }: { issueId?: string } =
   }
 
   async function saveDraft() {
-    if (savingIssue || hasUploadingEvidence) return;
-    setSavingIssue(true);
+    if (issueActionInProgress || hasUploadingEvidence) return;
+    setSavingDraft(true);
     try {
       const result = await requestJson<{ NewId: string; Status: string }>("/api/issues", "POST", issuePayload(editIssueId ? savedStatus : "Draft"));
       setIssueId(result.NewId);
@@ -223,7 +225,7 @@ export function CreateIssuePage({ issueId: editIssueId }: { issueId?: string } =
     } catch (err) {
       appToast.error({ title: "Gagal menyimpan draft", description: err instanceof Error ? err.message : undefined });
     } finally {
-      setSavingIssue(false);
+      setSavingDraft(false);
     }
   }
 
@@ -246,7 +248,7 @@ export function CreateIssuePage({ issueId: editIssueId }: { issueId?: string } =
       return;
     }
 
-    setSavingIssue(true);
+    setSubmittingIssue(true);
     try {
       const result = await requestJson<{ NewId: string; Status: string }>("/api/issues", "POST", issuePayload("Backlog"));
       setIssueId(null);
@@ -254,7 +256,7 @@ export function CreateIssuePage({ issueId: editIssueId }: { issueId?: string } =
     } catch (err) {
       appToast.error({ title: "Gagal submit issue", description: err instanceof Error ? err.message : undefined });
     } finally {
-      setSavingIssue(false);
+      setSubmittingIssue(false);
     }
   }
 
@@ -435,13 +437,13 @@ export function CreateIssuePage({ issueId: editIssueId }: { issueId?: string } =
               </p>
             ) : null}
             <div className="flex items-center gap-2" data-tour="actions">
-              <Button variant="outline" type="button" onClick={saveDraft} disabled={loadingIssue || savingIssue || hasUploadingEvidence}>
+              <Button variant="outline" type="button" onClick={saveDraft} disabled={loadingIssue || issueActionInProgress || hasUploadingEvidence}>
                 <Save />
-                {loadingIssue ? "Loading..." : savingIssue ? "Saving..." : editIssueId ? "Save changes" : "Save draft"}
+                {loadingIssue ? "Loading..." : savingDraft ? "Saving..." : editIssueId ? "Save changes" : "Save draft"}
               </Button>
-              <Button disabled={loadingIssue || hasUploadingEvidence || !isFormComplete || savingIssue} form={formId} type="submit">
+              <Button disabled={loadingIssue || hasUploadingEvidence || !isFormComplete || issueActionInProgress} form={formId} type="submit">
                 <SendHorizonal />
-                {savingIssue ? "Submitting..." : "Submit issue"}
+                {submittingIssue ? "Submitting..." : "Submit issue"}
               </Button>
             </div>
           </CardFooter>

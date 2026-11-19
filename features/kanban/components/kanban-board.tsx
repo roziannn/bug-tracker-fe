@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AlignLeft, Archive, ArrowDown, ArrowUp, Ban, Check, FolderOpenDot, Link2, MoreHorizontal, CheckSquare, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, GripVertical, ListFilter, MessageSquare, Pencil, Plus, Save, Search, Trash2, UserPlus, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -42,9 +42,51 @@ import {
 import type { Project } from "@/types";
 
 const COLUMNS_STORAGE_KEY = "bug-tracker:kanban-columns";
+const COLUMNS_CHANGE_EVENT = "bug-tracker:kanban-columns-change";
 const CURRENT_AUTHOR = "You";
 const KANBAN_PAGE_SIZE = 5;
 type PersistedKanbanCard = IssueRecord & { sequence: number };
+const DEFAULT_COLUMNS = kanbanColumns.filter((column) => column.id !== "Backlog");
+let cachedColumns = DEFAULT_COLUMNS;
+let cachedColumnsRaw: string | null = null;
+let hasReadColumns = false;
+let memoryOnlyColumns = false;
+
+function getColumnsSnapshot() {
+  if (typeof window === "undefined" || memoryOnlyColumns) return cachedColumns;
+  try {
+    const stored = window.localStorage.getItem(COLUMNS_STORAGE_KEY);
+    if (!hasReadColumns || stored !== cachedColumnsRaw) {
+      cachedColumnsRaw = stored;
+      hasReadColumns = true;
+      cachedColumns = stored ? JSON.parse(stored) as KanbanColumn[] : DEFAULT_COLUMNS;
+    }
+  } catch {
+    memoryOnlyColumns = true;
+  }
+  return cachedColumns;
+}
+
+function subscribeToColumns(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(COLUMNS_CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(COLUMNS_CHANGE_EVENT, onChange);
+  };
+}
+
+function updateStoredColumns(next: KanbanColumn[]) {
+  cachedColumns = next;
+  cachedColumnsRaw = JSON.stringify(next);
+  hasReadColumns = true;
+  try {
+    window.localStorage.setItem(COLUMNS_STORAGE_KEY, cachedColumnsRaw);
+  } catch {
+    memoryOnlyColumns = true;
+  }
+  window.dispatchEvent(new Event(COLUMNS_CHANGE_EVENT));
+}
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -1253,20 +1295,9 @@ export function KanbanBoard() {
   const previousRects = useRef<Map<string, DOMRect> | null>(null);
   const [isListGroupOpen, setIsListGroupOpen] = useState(false);
   const [draftColumns, setDraftColumns] = useState<KanbanColumn[]>([]);
-  const [columns, setColumns] = useState<KanbanColumn[]>(() =>
-    kanbanColumns.filter((column) => column.id !== "Backlog")
-  );
+  const columns = useSyncExternalStore(subscribeToColumns, getColumnsSnapshot, () => DEFAULT_COLUMNS);
   const [userNames, setUserNames] = useState<string[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-
-  useEffect(() => {
-    try {
-      const storedColumns = window.localStorage.getItem(COLUMNS_STORAGE_KEY);
-      if (storedColumns) setColumns(JSON.parse(storedColumns) as KanbanColumn[]);
-    } catch {
-      // ignore unreadable storage and keep default lists
-    }
-  }, []);
 
   useEffect(() => {
     requestJson<PersistedKanbanCard[]>("/api/kanban")
@@ -1305,15 +1336,6 @@ export function KanbanBoard() {
     [columns, issues, showArchived]
   );
 
-  function updateColumns(next: KanbanColumn[]) {
-    setColumns(next);
-    try {
-      window.localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // storage unavailable; changes stay in memory only
-    }
-  }
-
   function saveColumns() {
     const cleaned = draftColumns.map((column) => ({ ...column, title: column.title.trim() || "Untitled list" }));
     if (!cleaned.length) return;
@@ -1324,7 +1346,7 @@ export function KanbanBoard() {
     issuesRef.current = updated;
     setIssues(updated);
     persistOrder(updated);
-    updateColumns(cleaned);
+    updateStoredColumns(cleaned);
     setIsListGroupOpen(false);
   }
 

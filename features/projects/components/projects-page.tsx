@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BriefcaseBusiness, CalendarClock, Download, Edit, Eye, Flag, Pencil, Plus, Search, UserRound } from "lucide-react";
+import { Download, Edit, Eye, Plus, Search } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -10,13 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { appToast } from "@/lib/app-toast";
 import { getCurrentStatus, statusLabels, type CurrentStatus } from "@/features/projects/data/current-status";
-import { formatDate, parseDateOnly, todayDateOnly } from "@/lib/date";
+import { formatDate, todayDateOnly } from "@/lib/date";
 import { PriorityBadge } from "@/features/projects/components/priority-badge";
 import type { Project } from "@/types";
 
@@ -100,31 +99,6 @@ export function ProjectsPage() {
     () => new Map(allProjects.map((project) => [project.NewId, today === null ? null : getCurrentStatus(project.Phases, today)] as const)),
     [allProjects, today]
   );
-
-  // Angka ringkasan dihitung dari database.
-  const stats = useMemo(() => {
-    if (projects === null || today === null) return null;
-
-    const upcomingGoLive = projects.filter((project) => {
-      const goLive = project.GoLiveDate ? parseDateOnly(project.GoLiveDate) : null;
-      return goLive !== null && goLive >= today;
-    }).length;
-    const inProgress = Array.from(statuses.values()).filter((status) => status?.kind === "active").length;
-
-    return {
-      total: projects.length,
-      upcomingGoLive,
-      inProgress,
-      owners: new Set(projects.map((project) => project.OwnerId)).size,
-    };
-  }, [projects, statuses, today]);
-
-  const highlights = [
-    { label: "Tracked projects", note: "Projects in the portfolio.", icon: BriefcaseBusiness, value: stats?.total },
-    { label: "Upcoming go-lives", note: "Go Live date is today or later.", icon: Flag, value: stats?.upcomingGoLive },
-    { label: "In progress", note: "A phase is running today.", icon: CalendarClock, value: stats?.inProgress },
-    { label: "Project owners", note: "People who own a project.", icon: UserRound, value: stats?.owners },
-  ];
 
 const priorityOptions = useMemo(
   () => Array.from(new Set(allProjects.map((project) => project.Priority))).sort(),

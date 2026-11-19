@@ -81,8 +81,8 @@ export async function POST(req: NextRequest) {
     if (title.length > 255) return fail("Title must be 255 characters or fewer", 400);
     if (!CRITICALITIES.includes(body.criticality ?? "Tier 2 - Major")) return fail("Invalid criticality tier", 400);
 
-    const classificationId = Number.isInteger(body.classificationId) ? body.classificationId : null;
-    const picId = Number.isInteger(body.picId) ? body.picId : null;
+    const classificationId = typeof body.classificationId === "number" && Number.isInteger(body.classificationId) ? body.classificationId : null;
+    const picId = typeof body.picId === "number" && Number.isInteger(body.picId) ? body.picId : null;
     let projectId: number | null = null;
     if (body.projectId) {
       if (!GUID.test(body.projectId)) return fail("Invalid project", 400);

@@ -201,7 +201,10 @@
         });
     }, []);
 
-    const issueRows = issues ?? [];
+    const issueRows = useMemo(
+      () => issues ?? [],
+      [issues]
+    );
     const stats = [
       { title: "Total open", value: issueRows.filter((issue) => issue.status !== "Done" && issue.status !== "Draft").length, change: "Live", note: "Submitted issues", icon: TimerReset },
       { title: "In progress", value: issueRows.filter((issue) => ["Investigating", "In review"].includes(issue.status)).length, change: "Live", note: "Investigating or in review", icon: ListFilter },

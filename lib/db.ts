@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, type QueryResultRow } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@/db/schema";
 
@@ -21,7 +21,7 @@ export function getPool(): Pool {
 
 export const db = drizzle(getPool(), { schema });
 
-export async function query<T = any>(text: string, params: any[] = []): Promise<T[]> {
-  const result = await getPool().query(text, params);
+export async function query<T extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []): Promise<T[]> {
+  const result = await getPool().query<T>(text, params as never[]);
   return result.rows as T[];
 }

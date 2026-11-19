@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Bug, ChevronRight, ChevronsUpDown, CreditCard, LogOut, Plus, UserCircle2 } from "lucide-react";
+import { Bug, ChevronRight, ChevronsUpDown, LogOut, Plus, UserCircle2 } from "lucide-react";
 import { useCurrentUser } from "@/components/app/user-provider";
 import { SidebarNavigation } from "@/components/layout/sidebar-navigation";
 import { NotificationDropdown } from "@/components/shared/navigation/notification-dropdown";

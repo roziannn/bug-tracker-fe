@@ -6,7 +6,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Label, Line, LineChart, Pie, PieCha
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -150,9 +150,7 @@ export function DashboardOverview() {
   }, [actualIssues]);
 
   const totalIssues = actualIssues.length;
-  const urgentIssues = issuesByPriority
-    .filter((entry) => entry.priority === "Critical" || entry.priority === "High")
-    .reduce((total, entry) => total + entry.count, 0);
+
   const urgentWatchlist = useMemo(() => actualIssues
     .filter((issue) => issue.criticality === "Tier 1 - Critical" || issue.criticality === "Tier 2 - Major")
     .sort((left, right) => {
@@ -182,8 +180,6 @@ export function DashboardOverview() {
     total: { label: "Issues", color: "var(--color-chart-1)" },
     ...Object.fromEntries(issuesByStatus.map(({ status, fill }) => [status, { label: status, color: fill }])),
   }) satisfies ChartConfig, [issuesByStatus]);
-  const busiestTeam = issuesByTeam[0];
-  const busiestStatus = [...issuesByStatus].sort((left, right) => right.total - left.total)[0];
 
   useEffect(() => {
     let active = true;

@@ -1,7 +1,15 @@
+
 "use client";
 
 import type { ReactNode } from "react";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 type Theme = "light" | "dark" | "system";
 type ResolvedTheme = Exclude<Theme, "system">;
@@ -13,6 +21,8 @@ type ThemeContextValue = {
 };
 
 const STORAGE_KEY = "bug-tracker-theme";
+const THEME_CHANGE_EVENT = "bug-tracker-theme-change";
+
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function getSystemTheme(): ResolvedTheme {
@@ -20,45 +30,88 @@ function getSystemTheme(): ResolvedTheme {
     return "light";
   }
 
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
 }
 
-function applyTheme(theme: Theme) {
-  const resolvedTheme = theme === "system" ? getSystemTheme() : theme;
+function getStoredTheme(): Theme {
+  const storedTheme = window.localStorage.getItem(STORAGE_KEY);
+
+  return storedTheme === "light" ||
+    storedTheme === "dark" ||
+    storedTheme === "system"
+    ? storedTheme
+    : "system";
+}
+
+function getServerTheme(): Theme {
+  return "system";
+}
+
+function subscribeTheme(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(THEME_CHANGE_EVENT, callback);
+
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(THEME_CHANGE_EVENT, callback);
+  };
+}
+
+function applyTheme(theme: Theme): ResolvedTheme {
+  const resolvedTheme =
+    theme === "system" ? getSystemTheme() : theme;
+
   const root = document.documentElement;
 
-  // Matikan semua transition sesaat supaya seluruh elemen berganti warna serentak.
+  // Matikan transition sesaat agar perubahan tema serentak.
   const style = document.createElement("style");
-  style.appendChild(document.createTextNode("*,*::before,*::after{transition:none!important}"));
+  style.appendChild(
+    document.createTextNode(
+      "*,*::before,*::after{transition:none!important}"
+    )
+  );
+
   document.head.appendChild(style);
 
   root.classList.remove("light", "dark");
   root.classList.add(resolvedTheme);
   root.style.colorScheme = resolvedTheme;
 
-  // Paksa reflow sebelum style dilepas agar transition tidak jalan.
+  // Paksa reflow sebelum style dilepas.
   void window.getComputedStyle(root).opacity;
-  requestAnimationFrame(() => requestAnimationFrame(() => style.remove()));
+
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => style.remove())
+  );
 
   return resolvedTheme;
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system");
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
+export function ThemeProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const theme = useSyncExternalStore(
+    subscribeTheme,
+    getStoredTheme,
+    getServerTheme
+  );
+
+  const [resolvedTheme, setResolvedTheme] =
+    useState<ResolvedTheme>("light");
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
-    const nextTheme = storedTheme === "light" || storedTheme === "dark" || storedTheme === "system"
-      ? storedTheme
-      : "system";
-
-    setThemeState(nextTheme);
-    setResolvedTheme(applyTheme(nextTheme));
-  }, []);
+    setResolvedTheme(applyTheme(theme));
+  }, [theme]);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const mediaQuery = window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    );
+
     const handleChange = () => {
       if (theme === "system") {
         setResolvedTheme(applyTheme("system"));
@@ -66,7 +119,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     };
 
     mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
+
+    return () =>
+      mediaQuery.removeEventListener("change", handleChange);
   }, [theme]);
 
   const value = useMemo<ThemeContextValue>(
@@ -74,15 +129,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       theme,
       resolvedTheme,
       setTheme: (nextTheme) => {
-        setThemeState(nextTheme);
         window.localStorage.setItem(STORAGE_KEY, nextTheme);
+
+        // Beritahu subscriber bahwa tema berubah.
+        window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
+
         setResolvedTheme(applyTheme(nextTheme));
       },
     }),
-    [resolvedTheme, theme],
+    [theme, resolvedTheme]
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

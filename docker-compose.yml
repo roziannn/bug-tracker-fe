@@ -1,16 +1,27 @@
+
 services:
-  nextjs:
+  # DEVELOPMENT
+  nextjs-dev:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: nextjs-app
-    command: ["pnpm", "dev", "--webpack", "--hostname", "0.0.0.0"]
-    environment:
-      WATCHPACK_POLLING: "true"
+      target: development
+    container_name: bug-tracker-dev
     ports:
       - "3000:3000"
     volumes:
       - .:/app
       - /app/node_modules
       - /app/.next
+    restart: unless-stopped
+
+  # PRODUCTION BUILD
+  nextjs-build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: bug-tracker-build
+    ports:
+      - "3001:3000"
     restart: unless-stopped

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { appToast } from "@/lib/app-toast";
-import type { Project, User } from "@/types";
+import type { Project } from "@/types";
 
 type AttachmentDraft = { name: string; size: number; mimeType: string; id: string; contentBase64: string };
 const requestTypes = ["New Feature", "Enhancement", "Data/Report Request", "Lainnya"];
@@ -29,24 +29,25 @@ function readBase64(file: File) {
 
 export function ServiceRequestFormPage() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("New Feature");
   const [priority, setPriority] = useState("Medium");
   const [projectId, setProjectId] = useState("");
-  const [picId, setPicId] = useState("");
   const [justification, setJustification] = useState("");
   const [targetDate, setTargetDate] = useState("");
-  const [effort, setEffort] = useState("");
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/projects", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
-      fetch("/api/users?pageSize=100", { cache: "no-store" }).then((r) => r.ok ? r.json() : { data: [] }),
-    ]).then(([projectsResult, usersResult]) => { setProjects(projectsResult.filter((p: Project) => p.IsActive)); setUsers((usersResult.data ?? []).filter((u: User) => u.IsActive)); });
+    let active = true;
+    fetch("/api/projects", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<Project[]> : Promise.reject(new Error("Unable to load projects")))
+      .then((items) => { if (active) setProjects(items); })
+      .catch(() => {
+        if (active) appToast.error({ title: "Failed to load projects", description: "Project options are unavailable right now." });
+      });
+    return () => { active = false; };
   }, []);
 
   async function addAttachments(fileList: FileList | null) {
@@ -65,13 +66,13 @@ export function ServiceRequestFormPage() {
   }
 
   async function submit(status: "Draft" | "Submitted") {
-    if (status === "Submitted" && (!title.trim() || !description.trim() || !justification.trim() || !projectId || !picId)) {
+    if (status === "Submitted" && (!title.trim() || !description.trim() || !justification.trim() || !projectId)) {
       appToast.error({ title: "Complete required fields", description: "Title, description, business justification, project, and PIC are required to submit." });
       return;
     }
     setSaving(true);
     try {
-      const response = await fetch("/api/service-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, description, type, priority, projectId: projectId || null, picId: picId ? Number(picId) : null, businessJustification: justification, requestedTargetDate: targetDate || null, estimatedEffort: effort, status, attachments: attachments.map(({ name, size, mimeType, contentBase64 }) => ({ name, size, mimeType, contentBase64 })) }) });
+      const response = await fetch("/api/service-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, description, type, priority, projectId: projectId || null, businessJustification: justification, requestedTargetDate: targetDate || null, attachments: attachments.map(({ name, size, mimeType, contentBase64 }) => ({ name, size, mimeType, contentBase64 })) }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? "Unable to create service request");
       appToast.success({ title: status === "Draft" ? "Draft saved" : "Request submitted", description: "Your service request was saved." });
