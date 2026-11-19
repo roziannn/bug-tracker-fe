@@ -2,6 +2,7 @@
 
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox"
 import { CheckIcon, ChevronDownIcon } from "lucide-react"
+import type { ReactNode } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -10,6 +11,8 @@ export type SearchSelectOption = {
   label: string
   /** Teks kecil di bawah label (mis. email). Ikut dicari. */
   description?: string
+  /** Optional visual preview, such as an icon. */
+  icon?: ReactNode
 }
 
 type SearchSelectProps = {
@@ -79,6 +82,7 @@ function SearchSelect({
                   value={option}
                   className="relative flex w-full cursor-default items-center gap-2 rounded-md py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
                 >
+                  {option.icon ? <span className="flex size-5 shrink-0 items-center justify-center">{option.icon}</span> : null}
                   <div className="min-w-0 flex-1">
                     <p className="truncate">{option.label}</p>
                     {option.description ? (

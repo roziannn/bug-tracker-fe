@@ -138,7 +138,7 @@ export function DatabaseMonitorPage() {
   const averageLatency = latencies.length ? `${(latencies.reduce((total, latency) => total + latency, 0) / latencies.length).toFixed(1)} ms` : "—";
 
   return (
-    <AppShell activeNav="settings" title="Database Monitor" eyebrow="Infrastructure" breadcrumbs={[{ label: "Settings", href: "/settings" }, { label: "Database Monitor" }]}>
+    <AppShell activeNav="settings" title="Database Monitor" eyebrow="Infrastructure" breadcrumbs={[{ label: "Database Monitor" }]}>
       <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Card><CardContent className="flex items-center gap-3 p-5"><Database className="size-5 text-muted-foreground" /><div><p className="text-sm text-muted-foreground">Registered databases</p><p className="text-2xl font-semibold">{filteredServers.length}</p></div></CardContent></Card>

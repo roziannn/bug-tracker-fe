@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CircleHelp, FileUp, Save, SendHorizonal, Trash2, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -82,6 +83,7 @@ function formatFileSize(size: number) {
 }
 
 export function CreateIssuePage({ issueId: editIssueId }: { issueId?: string } = {}) {
+  const router = useRouter();
   const uploadId = useId();
   const formId = useId();
   const [title, setTitle] = useState("");
@@ -253,6 +255,7 @@ export function CreateIssuePage({ issueId: editIssueId }: { issueId?: string } =
       const result = await requestJson<{ NewId: string; Status: string }>("/api/issues", "POST", issuePayload("Backlog"));
       setIssueId(null);
       appToast.success({ title: "Issue berhasil disubmit", description: `Issue ID: ${result.NewId}` });
+      router.push("/issues");
     } catch (err) {
       appToast.error({ title: "Gagal submit issue", description: err instanceof Error ? err.message : undefined });
     } finally {

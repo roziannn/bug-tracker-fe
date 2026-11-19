@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { DatabaseMonitorPage } from "@/features/settings/components/database-monitor-page";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = { title: "Database Monitor" };
 
 export default function SettingsDatabaseMonitorRoute() {
-  return <DatabaseMonitorPage />;
+  redirect("/database-monitor");
 }

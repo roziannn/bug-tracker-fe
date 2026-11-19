@@ -56,6 +56,10 @@ export type MenuInput = z.infer<typeof menuSchema>;
 export const menuVisibleSchema = z.object({ visible: z.boolean() });
 
 export const menuMoveSchema = z.object({ direction: z.union([z.literal(-1), z.literal(1)]) });
+export const menuReorderSchema = z.object({
+  code: z.string().trim().min(1, "Menu code is required").max(150),
+  direction: z.union([z.literal(-1), z.literal(1)]),
+});
 
 export const roleAccessSchema = z.object({
   menus: z.array(z.string()).default([]),

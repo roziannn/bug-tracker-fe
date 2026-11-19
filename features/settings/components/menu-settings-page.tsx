@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
+import { SearchSelect } from "@/components/ui/search-select";
 import type { MenuNode } from "@/features/settings/data/access-catalog";
 import { descendantIds, fetchMenus, menuTrail, orderMenus, treeGuides } from "@/features/settings/data/menu-store";
 import { getMenuIcon, menuIcons, NO_ICON } from "@/features/settings/data/menu-icons";
@@ -106,7 +107,7 @@ export function MenuSettingsPage() {
   }
 
   function move(id: string, direction: -1 | 1) {
-    return runAction(id, () => request(`/api/menus/${id}/move`, "POST", { direction }), "Failed to reorder menu");
+    return runAction(id, () => request("/api/menus/reorder", "POST", { code: id, direction }), "Failed to reorder menu");
   }
 
   function toggleVisible(menu: MenuNode) {
@@ -424,19 +425,20 @@ export function MenuSettingsPage() {
               </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Icon</label>
-                <Select value={draft.icon} onValueChange={(value) => setDraft({ ...draft, icon: value ?? "Circle" })}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_ICON}>None</SelectItem>
-                    {Object.keys(menuIcons).map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchSelect
+                  options={[
+                    { value: NO_ICON, label: "None" },
+                    ...Object.entries(menuIcons).map(([name, Icon]) => ({
+                      value: name,
+                      label: name,
+                      icon: <Icon className="size-4" />,
+                    })),
+                  ]}
+                  value={draft.icon}
+                  onValueChange={(value) => setDraft({ ...draft, icon: value ?? "Circle" })}
+                  placeholder="Search Lucide icons..."
+                  emptyText="No icon found."
+                />
               </div>
 
               <div className="grid gap-2">

@@ -1,4 +1,3 @@
-
 FROM node:22-alpine AS base
 
 WORKDIR /app
@@ -19,7 +18,7 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["pnpm", "dev", "--hostname", "0.0.0.0"]
+CMD ["pnpm", "dev", "--webpack", "--hostname", "0.0.0.0"]
 
 # Production build
 FROM deps AS builder

@@ -176,6 +176,13 @@
       "when": 1795002000000,
       "tag": "0025_database_server_login_account",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795003000000,
+      "tag": "0026_database_monitor_root_menu",
+      "breakpoints": true
     }
   ]
 }
