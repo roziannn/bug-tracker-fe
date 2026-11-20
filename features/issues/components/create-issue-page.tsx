@@ -219,6 +219,10 @@ export function CreateIssuePage({ issueId: editIssueId }: { issueId?: string } =
 
   async function saveDraft() {
     if (issueActionInProgress || hasUploadingEvidence) return;
+    if (!title.trim()) {
+      appToast.error({ title: "Title wajib diisi", description: "Isi Title terlebih dahulu sebelum menyimpan draft." });
+      return;
+    }
     setSavingDraft(true);
     try {
       const result = await requestJson<{ NewId: string; Status: string }>("/api/issues", "POST", issuePayload(editIssueId ? savedStatus : "Draft"));

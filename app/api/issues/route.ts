@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
     const title = body.title?.trim() ?? "";
     const description = body.description?.trim() ?? "";
     const evidence = Array.isArray(body.evidence) ? body.evidence.filter((file) => typeof file.name === "string" && Number.isFinite(file.size)) : [];
+    if (!title) return fail("Title is required", 400);
     if (status !== "Draft" && (!title || !description || !body.classificationId || !body.picId || !body.projectId || !evidence.length)) {
       return fail("Lengkapi semua field wajib dan evidence sebelum submit issue", 400);
     }

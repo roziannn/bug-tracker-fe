@@ -14,7 +14,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     const access = await query<{ allowed: boolean }>(
       `SELECT EXISTS (
          SELECT 1 FROM "CORE_RoleMenu" rm JOIN "CORE_Menu" m ON m."Id" = rm."MenuId"
-         WHERE rm."RoleId" = $1 AND m."Code" = 'settings-database-monitor' AND m."IsVisible" = true
+         WHERE rm."RoleId" = $1 AND m."Path" = '/database-monitor' AND m."ParentId" IS NULL AND m."IsVisible" = true
        ) AS allowed`,
       [session.roleId],
     );
@@ -39,7 +39,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const access = await query<{ allowed: boolean }>(
       `SELECT EXISTS (
          SELECT 1 FROM "CORE_RoleMenu" rm JOIN "CORE_Menu" m ON m."Id" = rm."MenuId"
-         WHERE rm."RoleId" = $1 AND m."Code" = 'settings-database-monitor' AND m."IsVisible" = true
+         WHERE rm."RoleId" = $1 AND m."Path" = '/database-monitor' AND m."ParentId" IS NULL AND m."IsVisible" = true
        ) AS allowed`,
       [session.roleId],
     );

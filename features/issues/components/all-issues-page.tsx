@@ -14,7 +14,6 @@
   import { TablePagination } from "@/components/ui/table-pagination";
   import {
     priorityVariant,
-    statusVariant,
     type IssueRecord,
     type IssueStatus,
     type Priority,
@@ -26,11 +25,12 @@
   const PAGE_SIZE = 10;
 
   function statusBadgeClass(status: IssueStatus) {
-    if (status === "Done") return "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
-    if (status === "In review") return "border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-400";
-    if (status === "Investigating") return "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400";
-    if (status === "Ready") return "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400";
-    if (status === "Backlog") return "border-slate-500/20 bg-slate-500/10 text-slate-700 dark:text-slate-300";
+    if (status === "Done") return "border-transparent bg-emerald-600 text-white dark:bg-emerald-600 dark:text-white";
+    if (status === "In review") return "border-transparent bg-violet-600 text-white dark:bg-violet-600 dark:text-white";
+    if (status === "Investigating") return "border-transparent bg-amber-600 text-white dark:bg-amber-600 dark:text-white";
+    if (status === "Ready") return "border-transparent bg-blue-600 text-white dark:bg-blue-600 dark:text-white";
+    if (status === "Backlog") return "border-transparent bg-slate-600 text-white dark:bg-slate-600 dark:text-white";
+    if (status === "Draft") return "border-transparent bg-gray-500 text-white dark:bg-gray-500 dark:text-white";
     return "border-border bg-muted text-muted-foreground";
   }
 
@@ -365,7 +365,7 @@
                           {issue.team}
                         </TableCell>
                         <TableCell className="whitespace-normal">
-                          <Badge variant={statusVariant(issue.status)} className={statusBadgeClass(issue.status)}>{issue.status}</Badge>
+                          <Badge variant="outline" className={statusBadgeClass(issue.status)}>{issue.status}</Badge>
                         </TableCell>
                         <TableCell className="whitespace-normal">
                           <Badge variant={priorityVariant(issue.priority)}>
