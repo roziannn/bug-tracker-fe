@@ -21,6 +21,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const id = (await params).id;
     const body = await request.json().catch(() => null);
     if (!GUID.test(id) || !body || !SERVICE_REQUEST_STATUSES.includes(body.status)) return fail("Invalid service request update", 400);
+    if (body.status === "Returned" && (typeof body.reviewComment !== "string" || !body.reviewComment.trim())) return fail("A reason is required when returning a service request", 400);
     const session = await getSession();
     if (!session) return fail("Unauthorized", 401);
     const result = await updateServiceRequestStatus(id, body.status, typeof body.reviewComment === "string" ? body.reviewComment.slice(0, 5000) : "", session.name, session.email);

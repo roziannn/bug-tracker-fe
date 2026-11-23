@@ -1,6 +1,6 @@
 import { getPool, query } from "@/lib/db";
 
-export const SERVICE_REQUEST_STATUSES = ["Draft", "Submitted", "In Review", "Approved", "In Progress", "Done", "Rejected", "On Hold", "Cancelled"] as const;
+export const SERVICE_REQUEST_STATUSES = ["Draft", "Submitted", "In Review", "Approved", "In Progress", "Done", "Rejected", "Returned", "On Hold", "Cancelled"] as const;
 export const SERVICE_REQUEST_TYPES = ["New Feature", "Enhancement", "Data/Report Request", "Lainnya"] as const;
 export const SERVICE_REQUEST_PRIORITIES = ["Low", "Medium", "High", "Critical"] as const;
 
@@ -115,9 +115,9 @@ export async function updateServiceRequestStatus(id: string, status: string, rev
       return "missing-fields" as const;
     }
     const allowed: Record<string, string[]> = {
-      Draft: ["Submitted", "Cancelled"], Submitted: ["In Review", "Cancelled"], "In Review": ["Approved", "Rejected", "On Hold", "Cancelled"],
+      Draft: ["Submitted", "Cancelled"], Submitted: ["In Review", "Cancelled"], "In Review": ["Approved", "Rejected", "Returned", "On Hold"],
       Approved: ["In Progress", "On Hold", "Cancelled"], "In Progress": ["Done", "On Hold", "Cancelled"], "On Hold": ["In Review", "Approved", "In Progress", "Cancelled"],
-      Rejected: [], Done: [], Cancelled: [],
+      Rejected: [], Returned: ["Submitted"], Done: [], Cancelled: [],
     };
     if (status !== oldStatus && !allowed[oldStatus]?.includes(status)) { await client.query("ROLLBACK"); return "invalid-transition" as const; }
     await client.query(`UPDATE "DATA_ServiceRequests" SET "Status" = $2, "ReviewComment" = CASE WHEN $3 <> '' THEN $3 ELSE "ReviewComment" END, "UpdatedBy" = $4, "UpdatedDate" = now() WHERE "Id" = $1`, [current.rows[0].Id, status, reviewComment, updatedBy]);

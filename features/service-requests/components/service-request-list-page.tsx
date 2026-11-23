@@ -15,12 +15,12 @@ import type { Project } from "@/types";
 
 type RequestRow = { id: string; number: string; title: string; type: string; priority: string; status: string; requestedTargetDate: string | null; projectId: string | null; project: string | null; requester: string | null; pic: string | null; createdAt: string };
 const PAGE_SIZE = 10;
-const statuses = ["Draft", "Submitted", "In Review", "Approved", "In Progress", "Done", "Rejected", "On Hold", "Cancelled"];
+const statuses = ["Draft", "Submitted", "In Review", "Approved", "In Progress", "Done", "Rejected", "Returned", "On Hold", "Cancelled"];
 const priorities = ["Low", "Medium", "High", "Critical"];
 
 function statusStyle(status: string) {
   if (status === "Done" || status === "Approved") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
-  if (status === "Rejected" || status === "Cancelled") return "bg-destructive/10 text-destructive";
+  if (status === "Rejected" || status === "Returned" || status === "Cancelled") return "bg-destructive/10 text-destructive";
   if (status === "In Review" || status === "In Progress") return "bg-blue-500/10 text-blue-700 dark:text-blue-400";
   if (status === "On Hold") return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
   return "bg-muted text-muted-foreground";
