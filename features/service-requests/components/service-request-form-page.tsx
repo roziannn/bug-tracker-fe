@@ -72,7 +72,7 @@ export function ServiceRequestFormPage() {
     }
     setSaving(true);
     try {
-      const response = await fetch("/api/service-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, description, type, priority, projectId: projectId || null, businessJustification: justification, requestedTargetDate: targetDate || null, attachments: attachments.map(({ name, size, mimeType, contentBase64 }) => ({ name, size, mimeType, contentBase64 })) }) });
+      const response = await fetch("/api/service-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, title, description, type, priority, projectId: projectId || null, businessJustification: justification, requestedTargetDate: targetDate || null, attachments: attachments.map(({ name, size, mimeType, contentBase64 }) => ({ name, size, mimeType, contentBase64 })) }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? "Unable to create service request");
       appToast.success({ title: status === "Draft" ? "Draft saved" : "Request submitted", description: "Your service request was saved." });
