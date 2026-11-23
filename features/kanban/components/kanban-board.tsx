@@ -172,7 +172,7 @@ function IssueCard({
         "cursor-grab border border-foreground/15 bg-card dark:bg-zinc-800 shadow-md transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg active:cursor-grabbing",
         dragging && "scale-[0.97] opacity-50 ring-2 ring-primary/30",
         issue.inactive && "opacity-60 grayscale",
-        issue.archived && "border-dashed"
+        issue.archived && "border-dashed bg-muted/70 opacity-70 grayscale hover:translate-y-0 hover:border-foreground/15 hover:shadow-md"
       )}
     >
       <CardHeader>
@@ -190,7 +190,7 @@ function IssueCard({
               {issue.archived ? <span className="text-xs font-normal text-muted-foreground">Archived</span> : null}
               {issue.inactive ? <span className="text-xs font-normal text-muted-foreground">Inactive</span> : null}
             </CardTitle>
-            <CardDescription className="mt-1 leading-6 text-foreground/90">
+            <CardDescription className={cn("mt-1 leading-6", issue.archived ? "text-muted-foreground" : "text-foreground/90")}>
               {issue.title}
             </CardDescription>
           </div>
