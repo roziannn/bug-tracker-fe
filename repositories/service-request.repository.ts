@@ -33,7 +33,7 @@ export async function updateServiceRequestDraft(id: string, requesterId: number,
       const pic = await client.query(`SELECT 1 FROM "CORE_User" WHERE "Id" = $1 AND "IsActive" = true`, [input.picId]);
       if (!pic.rowCount) { await client.query("ROLLBACK"); return "pic-not-found" as const; }
     }
-    if (submit && (!input.title.trim() || !input.description.trim() || !input.businessJustification.trim() || !input.projectId || !input.picId)) {
+    if (submit && (!input.title.trim() || !input.description.trim() || !input.businessJustification.trim() || !input.projectId)) {
       await client.query("ROLLBACK"); return "missing-fields" as const;
     }
     const updated = await client.query(
@@ -140,14 +140,18 @@ export async function getServiceRequestAttachment(id: string, attachmentId: numb
   return rows[0] ?? null;
 }
 
-export async function updateServiceRequestStatus(id: string, status: string, reviewComment: string, actor: string, updatedBy: string) {
+export async function updateServiceRequestStatus(id: string, status: string, reviewComment: string, actor: string, updatedBy: string, picId: number | null = null, priority: string | null = null) {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
     const current = await client.query<{ Id: number; Status: string; Title: string; Description: string; BusinessJustification: string; ProjectId: number | null; PICId: number | null }>(`SELECT "Id", "Status", "Title", "Description", "BusinessJustification", "ProjectId", "PICId" FROM "DATA_ServiceRequests" WHERE "NewId" = $1 AND "IsActive" = true FOR UPDATE`, [id]);
     if (!current.rowCount) { await client.query("ROLLBACK"); return "not-found" as const; }
     const oldStatus = current.rows[0].Status;
-    if (status === "Submitted" && (!current.rows[0].Title.trim() || !current.rows[0].Description.trim() || !current.rows[0].BusinessJustification.trim() || !current.rows[0].ProjectId || !current.rows[0].PICId)) {
+    if (status === "In Progress") {
+      const pic = picId ? await client.query(`SELECT 1 FROM "CORE_User" WHERE "Id" = $1 AND "IsActive" = true`, [picId]) : null;
+      if (!pic?.rowCount) { await client.query("ROLLBACK"); return "pic-not-found" as const; }
+    }
+    if (status === "Submitted" && (!current.rows[0].Title.trim() || !current.rows[0].Description.trim() || !current.rows[0].BusinessJustification.trim() || !current.rows[0].ProjectId)) {
       await client.query("ROLLBACK");
       return "missing-fields" as const;
     }
@@ -157,7 +161,7 @@ export async function updateServiceRequestStatus(id: string, status: string, rev
       Rejected: [], Returned: ["Submitted"], Done: [], Cancelled: [],
     };
     if (status !== oldStatus && !allowed[oldStatus]?.includes(status)) { await client.query("ROLLBACK"); return "invalid-transition" as const; }
-    await client.query(`UPDATE "DATA_ServiceRequests" SET "Status" = $2, "ReviewComment" = CASE WHEN $3 <> '' THEN $3 ELSE "ReviewComment" END, "UpdatedBy" = $4, "UpdatedDate" = now() WHERE "Id" = $1`, [current.rows[0].Id, status, reviewComment, updatedBy]);
+    await client.query(`UPDATE "DATA_ServiceRequests" SET "Status" = $2, "ReviewComment" = CASE WHEN $3 <> '' THEN $3 ELSE "ReviewComment" END, "PICId" = COALESCE($5, "PICId"), "Priority" = COALESCE($6, "Priority"), "UpdatedBy" = $4, "UpdatedDate" = now() WHERE "Id" = $1`, [current.rows[0].Id, status, reviewComment, updatedBy, picId, priority]);
     if (status !== oldStatus || reviewComment) await client.query(`INSERT INTO "DATA_ServiceRequestActivities" ("ServiceRequestId", "Actor", "Action", "Detail", "CreatedBy", "CreatedDate") VALUES ($1, $2, $3, $4, $5, now())`, [current.rows[0].Id, actor, status !== oldStatus ? `Status changed to ${status}` : "Review updated", reviewComment || `${oldStatus} → ${status}`, updatedBy]);
     await client.query("COMMIT");
     return "ok" as const;

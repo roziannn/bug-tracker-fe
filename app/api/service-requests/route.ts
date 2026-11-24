@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const description = typeof body.description === "string" ? body.description.trim() : "";
     const businessJustification = typeof body.businessJustification === "string" ? body.businessJustification.trim() : "";
     if (title.length > 255 || description.length > 10000 || businessJustification.length > 5000) return fail("One or more fields exceed the allowed length", 400);
-    if (body.status === "Submitted" && (!title || !description || !businessJustification || !body.projectId || !body.picId)) return fail("Complete the required fields before submitting", 400);
+    if (body.status === "Submitted" && (!title || !description || !businessJustification || !body.projectId)) return fail("Complete the required fields before submitting", 400);
     if (body.requestedTargetDate && (typeof body.requestedTargetDate !== "string" || parseDateOnly(body.requestedTargetDate) === null)) return fail("Requested target date is invalid", 400);
     const attachments: { name: string; size: number; mimeType?: string; contentBase64?: string }[] = [];
     if (Array.isArray(body.attachments)) {

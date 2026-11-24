@@ -57,10 +57,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
     if (!SERVICE_REQUEST_STATUSES.includes(body.status)) return fail("Invalid service request update", 400);
     if (body.status === "Returned" && (typeof body.reviewComment !== "string" || !body.reviewComment.trim())) return fail("A reason is required when returning a service request", 400);
-    const result = await updateServiceRequestStatus(id, body.status, typeof body.reviewComment === "string" ? body.reviewComment.slice(0, 5000) : "", session.name, session.email);
+    if (body.status === "In Progress" && (!Number.isInteger(body.picId) || !SERVICE_REQUEST_PRIORITIES.includes(body.priority))) return fail("Choose a PIC and priority before moving this request to In Progress", 400);
+    const result = await updateServiceRequestStatus(id, body.status, typeof body.reviewComment === "string" ? body.reviewComment.slice(0, 5000) : "", session.name, session.email, Number.isInteger(body.picId) ? body.picId : null, SERVICE_REQUEST_PRIORITIES.includes(body.priority) ? body.priority : null);
     if (result === "not-found") return fail("Service request not found", 404);
     if (result === "invalid-transition") return fail("This status transition is not allowed", 400);
     if (result === "missing-fields") return fail("Complete the required fields before submitting", 400);
+    if (result === "pic-not-found") return fail("PIC not found", 400);
     return ok({ updated: true });
   } catch (error) { return handleError(error); }
 }

@@ -67,7 +67,7 @@ export function ServiceRequestFormPage() {
 
   async function submit(status: "Draft" | "Submitted") {
     if (status === "Submitted" && (!title.trim() || !description.trim() || !justification.trim() || !projectId)) {
-      appToast.error({ title: "Complete required fields", description: "Title, description, business justification, project, and PIC are required to submit." });
+      appToast.error({ title: "Complete required fields", description: "Title, description, business justification, and project are required to submit." });
       return;
     }
     setSaving(true);
