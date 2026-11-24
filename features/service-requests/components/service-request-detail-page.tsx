@@ -2,17 +2,21 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Check, ClipboardList, Download, FileText, History, MessageSquare, Paperclip, Reply, Send, X } from "lucide-react";
+import { ArrowLeft, Check, ClipboardList, Download, FileText, FileUp, History, MessageSquare, Paperclip, Reply, Save, Send, Trash2, X } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { MentionText, MentionTextarea } from "@/features/issues/components/database-issue-detail-page";
 import { appToast } from "@/lib/app-toast";
 import { formatDate } from "@/lib/date";
-import type { User } from "@/types";
+import type { Project, User } from "@/types";
 
 type RequestDetail = {
   id: string; number: string; title: string; description: string; type: string; priority: string; status: string;
@@ -24,6 +28,9 @@ type RequestDetail = {
   issues: { id: string; number: string; title: string }[];
 };
 type IssueOption = { id: string; newId: string; title: string };
+type NewAttachment = { name: string; size: number; mimeType: string; contentBase64: string };
+const requestTypes = ["New Feature", "Enhancement", "Data/Report Request", "Lainnya"];
+const priorities = ["Low", "Medium", "High", "Critical"];
 const statusOptions: Record<string, string[]> = {
   Draft: ["Submitted", "Cancelled"], Submitted: ["In Review", "Cancelled"], "In Review": ["Approved", "Rejected", "Returned", "On Hold"],
   Approved: ["In Progress", "On Hold", "Cancelled"], "In Progress": ["Done", "On Hold", "Cancelled"], "On Hold": ["In Review", "Approved", "In Progress", "Cancelled"],
@@ -35,6 +42,17 @@ function formatSize(size: number) { return size >= 1048576 ? `${(size / 1048576)
 export function ServiceRequestDetailPage({ id }: { id: string }) {
   const [request, setRequest] = useState<RequestDetail | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
+  const [draftType, setDraftType] = useState("New Feature");
+  const [draftPriority, setDraftPriority] = useState("Medium");
+  const [draftProjectId, setDraftProjectId] = useState("");
+  const [draftPicId, setDraftPicId] = useState("");
+  const [draftJustification, setDraftJustification] = useState("");
+  const [draftTargetDate, setDraftTargetDate] = useState("");
+  const [keptAttachmentIds, setKeptAttachmentIds] = useState<number[]>([]);
+  const [newAttachments, setNewAttachments] = useState<NewAttachment[]>([]);
   const [issueOptions, setIssueOptions] = useState<IssueOption[]>([]);
   const [issueToLink, setIssueToLink] = useState("");
   const [loading, setLoading] = useState(true);
@@ -49,7 +67,17 @@ export function ServiceRequestDetailPage({ id }: { id: string }) {
     try {
       const response = await fetch(`/api/service-requests/${encodeURIComponent(id)}`, { cache: "no-store" });
       if (!response.ok) throw new Error(response.status === 404 ? "Service request not found" : "Unable to load service request");
-      setRequest(await response.json());
+      const item = await response.json() as RequestDetail;
+      setRequest(item);
+      setDraftTitle(item.title);
+      setDraftDescription(item.description);
+      setDraftType(item.type);
+      setDraftPriority(item.priority);
+      setDraftProjectId(item.projectId ?? "");
+      setDraftPicId(item.picId ? String(item.picId) : "");
+      setDraftJustification(item.businessJustification);
+      setDraftTargetDate(item.requestedTargetDate ?? "");
+      setKeptAttachmentIds(item.attachments.map((file) => file.id));
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to load service request"); }
     finally { setLoading(false); }
   }, [id]);
@@ -57,8 +85,62 @@ export function ServiceRequestDetailPage({ id }: { id: string }) {
   useEffect(() => {
     void load();
     fetch("/api/users?pageSize=100", { cache: "no-store" }).then((r) => r.ok ? r.json() : { data: [] }).then((result) => setUsers(result.data ?? [])).catch(() => setUsers([]));
+    fetch("/api/projects", { cache: "no-store" }).then((r) => r.ok ? r.json() : []).then(setProjects).catch(() => setProjects([]));
     fetch("/api/issues", { cache: "no-store" }).then((r) => r.ok ? r.json() : []).then(setIssueOptions).catch(() => setIssueOptions([]));
   }, [load]);
+
+  async function addDraftAttachments(fileList: FileList | null) {
+    const files = Array.from(fileList ?? []);
+    let count = (request?.attachments.filter((file) => keptAttachmentIds.includes(file.id)).length ?? 0) + newAttachments.length;
+    let total = request?.attachments.filter((file) => keptAttachmentIds.includes(file.id)).reduce((sum, file) => sum + file.size, 0) ?? 0;
+    total += newAttachments.reduce((sum, file) => sum + file.size, 0);
+    const accepted = files.filter((file) => {
+      if (count >= 20 || file.size > 5 * 1024 * 1024 || total + file.size > 15 * 1024 * 1024) return false;
+      count += 1;
+      total += file.size;
+      return true;
+    });
+    if (accepted.length < files.length) appToast.error({ title: "Some files were skipped", description: "Add up to 20 attachments, 5 MB each and 15 MB total." });
+    try {
+      const encoded = await Promise.all(accepted.map(async (file) => ({
+        name: file.name, size: file.size, mimeType: file.type,
+        contentBase64: await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+          reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+          reader.readAsDataURL(file);
+        }),
+      })));
+      setNewAttachments((current) => [...current, ...encoded].slice(0, 20));
+    } catch (err) { appToast.error({ title: "Unable to read attachment", description: err instanceof Error ? err.message : undefined }); }
+  }
+
+  async function saveDraft(submit: boolean) {
+    if (!request) return;
+    if (submit && (!draftTitle.trim() || !draftDescription.trim() || !draftJustification.trim() || !draftProjectId || !draftPicId)) {
+      appToast.error({ title: "Complete required fields", description: "Title, description, business justification, project, and PIC are required to submit." });
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/service-requests/${encodeURIComponent(id)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draftAction: submit ? "submit" : "save", title: draftTitle, description: draftDescription,
+          type: draftType, priority: draftPriority, projectId: draftProjectId || null,
+          picId: draftPicId ? Number(draftPicId) : null, businessJustification: draftJustification,
+          requestedTargetDate: draftTargetDate || null, keptAttachmentIds,
+          attachments: newAttachments,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "Unable to save request");
+      setNewAttachments([]);
+      await load();
+      appToast.success({ title: submit ? "Request submitted" : "Draft saved", description: submit ? "Your request is ready for review." : "Your draft changes were saved." });
+    } catch (err) { appToast.error({ title: "Unable to save request", description: err instanceof Error ? err.message : undefined }); }
+    finally { setBusy(false); }
+  }
 
   async function changeStatus(status: string) {
     if (!request) return;
@@ -110,12 +192,35 @@ export function ServiceRequestDetailPage({ id }: { id: string }) {
       <Card className="gap-0 overflow-hidden py-0 lg:col-span-2"><Tabs defaultValue="overview" className="gap-0"><CardHeader className="gap-0 border-b bg-muted/20 px-4 py-4 sm:px-5"><div className="overflow-x-auto"><TabsList className="h-auto min-h-14 w-max min-w-full justify-start gap-1.5 rounded-xl border bg-muted/60 p-1.5"><TabsTrigger value="overview" className="h-12 flex-none cursor-pointer rounded-lg px-5 text-sm text-muted-foreground transition-colors hover:text-foreground data-active:bg-background data-active:text-primary data-active:shadow-sm after:hidden"><ClipboardList />Overview</TabsTrigger>{request.status !== "Draft" ? <TabsTrigger value="review" className="h-12 flex-none cursor-pointer rounded-lg px-5 text-sm text-muted-foreground transition-colors hover:text-foreground data-active:bg-background data-active:text-primary data-active:shadow-sm after:hidden"><Check />Review &amp; Approval</TabsTrigger> : null}<TabsTrigger value="discussion" className="h-12 flex-none cursor-pointer rounded-lg px-5 text-sm text-muted-foreground transition-colors hover:text-foreground data-active:bg-background data-active:text-primary data-active:shadow-sm after:hidden"><MessageSquare />Discussion <span className="rounded-full bg-background/80 px-1.5 py-0.5 text-[11px] text-muted-foreground">{request.comments.length}</span></TabsTrigger><TabsTrigger value="activity" className="h-12 flex-none cursor-pointer rounded-lg px-5 text-sm text-muted-foreground transition-colors hover:text-foreground data-active:bg-background data-active:text-primary data-active:shadow-sm after:hidden"><History />Activity</TabsTrigger></TabsList></div></CardHeader>
         <CardContent className="pt-5 pb-5">
           <TabsContent value="overview" className="space-y-5">
-            {request.status === "Draft" ? <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="text-sm font-semibold">This request is still a draft</h3><p className="mt-1 text-sm text-muted-foreground">Submit it when the details are ready for review.</p></div><Button disabled={busy} onClick={() => void changeStatus("Submitted")}><Send />Submit request</Button></div> : null}
+            {request.status === "Draft" ? <div className="space-y-5">
+              <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="text-sm font-semibold">This request is still a draft</h3><p className="mt-1 text-sm text-muted-foreground">Edit the details below, then save or submit it for review.</p></div><Badge variant="outline">Draft</Badge></div>
+              <Card><CardHeader><CardTitle>Request details</CardTitle><p className="text-sm text-muted-foreground">Update the request title, type, priority, and description.</p></CardHeader><CardContent className="grid gap-4 md:grid-cols-[2fr_1fr_1fr]">
+                <div className="grid min-w-0 gap-2"><Label htmlFor="draft-title">Title *</Label><Input id="draft-title" maxLength={255} value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} /></div>
+                <div className="grid min-w-0 gap-2"><Label>Type</Label><Select value={draftType} onValueChange={(value) => value && setDraftType(value)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{requestTypes.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
+                <div className="grid min-w-0 gap-2"><Label>Priority</Label><Select value={draftPriority} onValueChange={(value) => value && setDraftPriority(value)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{priorities.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
+                <div className="grid gap-2 md:col-span-3"><Label htmlFor="draft-description">Description *</Label><Textarea id="draft-description" rows={5} maxLength={10000} value={draftDescription} onChange={(e) => setDraftDescription(e.target.value)} /></div>
+              </CardContent></Card>
+              <Card><CardHeader><CardTitle>Business case &amp; planning</CardTitle><p className="text-sm text-muted-foreground">Explain the business need and select the project and PIC.</p></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2"><Label htmlFor="draft-justification">Business justification *</Label><Textarea id="draft-justification" className="min-h-28" maxLength={5000} value={draftJustification} onChange={(e) => setDraftJustification(e.target.value)} /></div>
+                <div className="grid gap-4">
+                  <div className="grid gap-2"><Label>Project *</Label><Select value={draftProjectId} onValueChange={(value) => value && setDraftProjectId(value)}><SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger><SelectContent>{projects.map((project) => <SelectItem key={project.NewId} value={project.NewId}>{project.Name}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="grid gap-2"><Label>PIC *</Label><Select value={draftPicId} onValueChange={(value) => value && setDraftPicId(value)}><SelectTrigger><SelectValue placeholder="Select PIC" /></SelectTrigger><SelectContent>{users.map((user) => <SelectItem key={user.Id} value={String(user.Id)}>{user.Name}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="grid gap-2"><Label htmlFor="draft-target-date">Requested target date</Label><Input id="draft-target-date" type="date" value={draftTargetDate} onChange={(e) => setDraftTargetDate(e.target.value)} /></div>
+                </div>
+              </CardContent></Card>
+              <Card><CardHeader><CardTitle>Attachments</CardTitle><p className="text-sm text-muted-foreground">Add or remove supporting files (up to 20 files, 5 MB each).</p></CardHeader><CardContent className="space-y-3">
+                <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed p-6 text-center text-sm transition-colors hover:bg-muted/40"><FileUp className="size-5 text-muted-foreground" /><span>Choose files</span><input type="file" multiple className="sr-only" onChange={(event) => { void addDraftAttachments(event.currentTarget.files); event.currentTarget.value = ""; }} /></label>
+                {request.attachments.filter((file) => keptAttachmentIds.includes(file.id)).map((file) => <div key={file.id} className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"><span className="min-w-0 truncate">{file.name} <span className="text-muted-foreground">({formatSize(file.size)})</span></span><Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${file.name}`} onClick={() => setKeptAttachmentIds((current) => current.filter((attachmentId) => attachmentId !== file.id))}><Trash2 /></Button></div>)}
+                {newAttachments.map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"><span className="min-w-0 truncate">{file.name} <span className="text-muted-foreground">({formatSize(file.size)})</span></span><Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${file.name}`} onClick={() => setNewAttachments((current) => current.filter((_, fileIndex) => fileIndex !== index))}><Trash2 /></Button></div>)}
+              </CardContent></Card>
+              <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" disabled={busy} onClick={() => void saveDraft(false)}><Save />{busy ? "Saving..." : "Save draft"}</Button><Button disabled={busy} onClick={() => void saveDraft(true)}><Send />Submit request</Button></div>
+            </div> : <>
             <section className="rounded-xl border bg-muted/20 p-4"><h3 className="mb-2 text-sm font-semibold">Description</h3><p className="whitespace-pre-wrap text-sm leading-6">{request.description || "No description provided."}</p></section>
             <section className="rounded-xl border bg-muted/20 p-4"><h3 className="mb-2 text-sm font-semibold">Business justification</h3><p className="whitespace-pre-wrap text-sm leading-6">{request.businessJustification || "No business justification provided."}</p></section>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[["Requester", request.requester], ["PIC", request.pic], ["Requested target", request.requestedTargetDate], ["effort", request.estimatedEffort]].map(([label, value]) => <div key={label} className="rounded-lg border p-3"><p className="text-xs font-medium text-muted-foreground">{label}</p><p className="mt-1 text-sm font-medium">{value || "—"}</p></div>)}</div>
             <section><h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Paperclip className="size-4" />Attachments</h3>{request.attachments.length ? <div className="grid gap-2 sm:grid-cols-2">{request.attachments.map((file) => <div key={file.id} className="flex items-center gap-2 rounded-lg border p-3 text-sm"><FileText className="size-4 shrink-0 text-muted-foreground" /><span className="min-w-0 flex-1 truncate">{file.name} <span className="text-xs text-muted-foreground">({formatSize(file.size)})</span></span><Button nativeButton={false} render={<a href={`/api/service-requests/${encodeURIComponent(id)}/attachments/${file.id}`} />} type="button" variant="ghost" size="icon-sm" aria-label={`Download ${file.name}`}><Download /></Button></div>)}</div> : <p className="text-sm text-muted-foreground">No attachments.</p>}</section>
             <section className="space-y-2"><h3 className="text-sm font-semibold">Linked issues</h3>{request.issues.map((issue) => <Link key={issue.id} href={`/issues/${issue.id}`} className="block rounded-lg border p-3 text-sm hover:bg-muted/50"><span className="font-medium text-primary">{issue.number}</span> · {issue.title}</Link>)}<div className="flex flex-col gap-2 sm:flex-row"><select aria-label="Select issue to link" value={issueToLink} onChange={(e) => setIssueToLink(e.target.value)} className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"><option value="">Link an issue…</option>{issueOptions.filter((issue) => !request.issues.some((linked) => linked.id === issue.newId)).map((issue) => <option key={issue.newId} value={issue.newId}>{issue.id} · {issue.title}</option>)}</select><Button type="button" variant="outline" disabled={!issueToLink || busy} onClick={() => void linkIssue()}>Link issue</Button></div></section>
+            </>}
           </TabsContent>
           {request.status !== "Draft" ? <TabsContent value="review" className="space-y-5">
             <div className="rounded-xl border p-4"><h3 className="text-sm font-semibold">Review notes</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{request.reviewComment || "No review notes yet."}</p></div>

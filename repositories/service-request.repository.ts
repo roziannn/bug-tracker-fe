@@ -18,6 +18,43 @@ export type ServiceRequestInput = {
   attachments: { name: string; size: number; mimeType?: string; contentBase64?: string }[];
 };
 
+export async function updateServiceRequestDraft(id: string, requesterId: number, input: ServiceRequestInput, keptAttachmentIds: number[], submit: boolean, actor: string, updatedBy: string) {
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const current = await client.query<{ Id: number; Status: string; RequesterId: number | null }>(
+      `SELECT "Id", "Status", "RequesterId" FROM "DATA_ServiceRequests" WHERE "NewId" = $1 AND "IsActive" = true FOR UPDATE`, [id]
+    );
+    if (!current.rowCount) { await client.query("ROLLBACK"); return "not-found" as const; }
+    if (current.rows[0].Status !== "Draft" || current.rows[0].RequesterId !== requesterId) { await client.query("ROLLBACK"); return "not-editable" as const; }
+    const project = input.projectId ? await client.query<{ Id: number }>(`SELECT "Id" FROM "DATA_Projects" WHERE "NewId" = $1 AND "IsActive" = true`, [input.projectId]) : null;
+    if (input.projectId && !project?.rowCount) { await client.query("ROLLBACK"); return "project-not-found" as const; }
+    if (input.picId) {
+      const pic = await client.query(`SELECT 1 FROM "CORE_User" WHERE "Id" = $1 AND "IsActive" = true`, [input.picId]);
+      if (!pic.rowCount) { await client.query("ROLLBACK"); return "pic-not-found" as const; }
+    }
+    if (submit && (!input.title.trim() || !input.description.trim() || !input.businessJustification.trim() || !input.projectId || !input.picId)) {
+      await client.query("ROLLBACK"); return "missing-fields" as const;
+    }
+    const updated = await client.query(
+      `UPDATE "DATA_ServiceRequests" SET "Title" = $2, "Description" = $3, "Type" = $4, "Priority" = $5, "ProjectId" = $6,
+        "PICId" = $7, "BusinessJustification" = $8, "RequestedTargetDate" = $9, "Status" = $10, "UpdatedBy" = $11, "UpdatedDate" = now()
+       WHERE "Id" = $1 RETURNING "Id"`,
+      [current.rows[0].Id, input.title.trim(), input.description.trim(), input.type, input.priority, project?.rows[0]?.Id ?? null,
+        input.picId, input.businessJustification.trim(), input.requestedTargetDate, submit ? "Submitted" : "Draft", updatedBy]
+    );
+    await client.query(`UPDATE "DATA_ServiceRequestAttachments" SET "IsActive" = false, "UpdatedBy" = $3, "UpdatedDate" = now() WHERE "ServiceRequestId" = $1 AND "IsActive" = true AND NOT ("Id" = ANY($2::int[]))`, [updated.rows[0].Id, keptAttachmentIds, updatedBy]);
+    for (const attachment of input.attachments) {
+      await client.query(`INSERT INTO "DATA_ServiceRequestAttachments" ("ServiceRequestId", "Name", "Size", "MimeType", "Content", "CreatedBy", "CreatedDate") VALUES ($1, $2, $3, $4, $5, $6, now())`, [updated.rows[0].Id, attachment.name, attachment.size, attachment.mimeType ?? "", attachment.contentBase64 ? Buffer.from(attachment.contentBase64, "base64") : null, updatedBy]);
+    }
+    const action = submit ? "Request submitted" : "Draft updated";
+    await client.query(`INSERT INTO "DATA_ServiceRequestActivities" ("ServiceRequestId", "Actor", "Action", "Detail", "CreatedBy", "CreatedDate") VALUES ($1, $2, $3, $4, $5, now())`, [updated.rows[0].Id, actor, action, input.title.trim() || "Service request updated", updatedBy]);
+    await client.query("COMMIT");
+    return "ok" as const;
+  } catch (error) { await client.query("ROLLBACK"); throw error; }
+  finally { client.release(); }
+}
+
 export async function listServiceRequests(filters: { status?: string; priority?: string; projectId?: string }) {
   return query(
     `SELECT sr."NewId" AS "id", sr."RequestNumber" AS "number", sr."Title" AS "title", sr."Type" AS "type",
