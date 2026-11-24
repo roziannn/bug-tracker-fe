@@ -26,7 +26,7 @@ export async function updateServiceRequestDraft(id: string, requesterId: number,
       `SELECT "Id", "Status", "RequesterId" FROM "DATA_ServiceRequests" WHERE "NewId" = $1 AND "IsActive" = true FOR UPDATE`, [id]
     );
     if (!current.rowCount) { await client.query("ROLLBACK"); return "not-found" as const; }
-    if (current.rows[0].Status !== "Draft" || current.rows[0].RequesterId !== requesterId) { await client.query("ROLLBACK"); return "not-editable" as const; }
+    if (!(current.rows[0].Status === "Draft" || current.rows[0].Status === "Returned") || current.rows[0].RequesterId !== requesterId) { await client.query("ROLLBACK"); return "not-editable" as const; }
     const project = input.projectId ? await client.query<{ Id: number }>(`SELECT "Id" FROM "DATA_Projects" WHERE "NewId" = $1 AND "IsActive" = true`, [input.projectId]) : null;
     if (input.projectId && !project?.rowCount) { await client.query("ROLLBACK"); return "project-not-found" as const; }
     if (input.picId) {
@@ -41,13 +41,13 @@ export async function updateServiceRequestDraft(id: string, requesterId: number,
         "PICId" = $7, "BusinessJustification" = $8, "RequestedTargetDate" = $9, "Status" = $10, "UpdatedBy" = $11, "UpdatedDate" = now()
        WHERE "Id" = $1 RETURNING "Id"`,
       [current.rows[0].Id, input.title.trim(), input.description.trim(), input.type, input.priority, project?.rows[0]?.Id ?? null,
-        input.picId, input.businessJustification.trim(), input.requestedTargetDate, submit ? "Submitted" : "Draft", updatedBy]
+        input.picId, input.businessJustification.trim(), input.requestedTargetDate, submit ? "Submitted" : current.rows[0].Status, updatedBy]
     );
     await client.query(`UPDATE "DATA_ServiceRequestAttachments" SET "IsActive" = false, "UpdatedBy" = $3, "UpdatedDate" = now() WHERE "ServiceRequestId" = $1 AND "IsActive" = true AND NOT ("Id" = ANY($2::int[]))`, [updated.rows[0].Id, keptAttachmentIds, updatedBy]);
     for (const attachment of input.attachments) {
       await client.query(`INSERT INTO "DATA_ServiceRequestAttachments" ("ServiceRequestId", "Name", "Size", "MimeType", "Content", "CreatedBy", "CreatedDate") VALUES ($1, $2, $3, $4, $5, $6, now())`, [updated.rows[0].Id, attachment.name, attachment.size, attachment.mimeType ?? "", attachment.contentBase64 ? Buffer.from(attachment.contentBase64, "base64") : null, updatedBy]);
     }
-    const action = submit ? "Request submitted" : "Draft updated";
+    const action = submit ? "Request submitted" : current.rows[0].Status === "Returned" ? "Returned request updated" : "Draft updated";
     await client.query(`INSERT INTO "DATA_ServiceRequestActivities" ("ServiceRequestId", "Actor", "Action", "Detail", "CreatedBy", "CreatedDate") VALUES ($1, $2, $3, $4, $5, now())`, [updated.rows[0].Id, actor, action, input.title.trim() || "Service request updated", updatedBy]);
     await client.query("COMMIT");
     return "ok" as const;
@@ -81,7 +81,7 @@ export async function getServiceRequest(id: string) {
       sr."RequesterId" AS "requesterId", requester."Name" AS "requester", sr."PICId" AS "picId", pic."Name" AS "pic",
       sr."BusinessJustification" AS "businessJustification", sr."RequestedTargetDate"::text AS "requestedTargetDate",
       sr."EstimatedEffort" AS "estimatedEffort", sr."ReviewComment" AS "reviewComment",
-      sr."CreatedBy" AS "createdBy", sr."CreatedDate" AS "createdAt"
+      sr."CreatedBy" AS "createdBy", sr."CreatedDate" AS "createdAt", sr."UpdatedBy" AS "updatedBy", sr."UpdatedDate" AS "updatedAt"
      FROM "DATA_ServiceRequests" sr
      LEFT JOIN "DATA_Projects" p ON p."Id" = sr."ProjectId"
      LEFT JOIN "CORE_User" requester ON requester."Id" = sr."RequesterId"
@@ -93,7 +93,14 @@ export async function getServiceRequest(id: string) {
   const [attachments, comments, activities, issues] = await Promise.all([
     query(`SELECT "Id" AS "id", "Name" AS "name", "Size" AS "size", "MimeType" AS "mimeType" FROM "DATA_ServiceRequestAttachments" WHERE "ServiceRequestId" = $1 AND "IsActive" = true ORDER BY "Id"`, [request.internalId]),
     query(`SELECT "Id" AS "id", "ParentCommentId" AS "parentCommentId", "Author" AS "author", "Body" AS "body", "CreatedDate" AS "createdAt" FROM "DATA_ServiceRequestComments" WHERE "ServiceRequestId" = $1 AND "IsActive" = true ORDER BY "CreatedDate", "Id"`, [request.internalId]),
-    query(`SELECT "Id" AS "id", "Actor" AS "actor", "Action" AS "action", "Detail" AS "detail", "CreatedDate" AS "createdAt" FROM "DATA_ServiceRequestActivities" WHERE "ServiceRequestId" = $1 ORDER BY "CreatedDate" DESC, "Id" DESC`, [request.internalId]),
+    query(`SELECT a."Id" AS "id", a."Actor" AS "actor", a."Action" AS "action", a."Detail" AS "detail", a."CreatedDate" AS "createdAt", role."Name" AS "actorRole"
+      FROM "DATA_ServiceRequestActivities" a
+      LEFT JOIN LATERAL (
+        SELECT r."Name" FROM "CORE_RoleClaim" rc JOIN "CORE_Role" r ON r."Id" = rc."RoleId"
+        WHERE lower(rc."Email") = lower(a."CreatedBy") AND rc."IsActive" = true AND r."IsActive" = true
+        ORDER BY rc."Id" LIMIT 1
+      ) role ON true
+      WHERE a."ServiceRequestId" = $1 ORDER BY a."CreatedDate" DESC, a."Id" DESC`, [request.internalId]),
     query(`SELECT i."NewId" AS "id", 'BUG-' || lpad(i."Id"::text, 3, '0') AS "number", i."Title" AS "title" FROM "DATA_ServiceRequestIssues" sri JOIN "DATA_Issues" i ON i."Id" = sri."IssueId" WHERE sri."ServiceRequestId" = $1 AND sri."IsActive" = true ORDER BY i."Id"`, [request.internalId]),
   ]);
   return { ...request, attachments, comments, activities, issues };
@@ -140,6 +147,26 @@ export async function getServiceRequestAttachment(id: string, attachmentId: numb
   return rows[0] ?? null;
 }
 
+export async function addServiceRequestAttachments(id: string, attachments: { name: string; size: number; mimeType?: string; contentBase64?: string }[], actor: string, updatedBy: string) {
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const request = await client.query<{ Id: number }>(`SELECT "Id" FROM "DATA_ServiceRequests" WHERE "NewId" = $1 AND "IsActive" = true FOR UPDATE`, [id]);
+    if (!request.rowCount) { await client.query("ROLLBACK"); return "not-found" as const; }
+    const totals = await client.query<{ Count: number; Size: number }>(`SELECT COUNT(*)::int AS "Count", COALESCE(SUM("Size"), 0)::int AS "Size" FROM "DATA_ServiceRequestAttachments" WHERE "ServiceRequestId" = $1 AND "IsActive" = true`, [request.rows[0].Id]);
+    if (totals.rows[0].Count + attachments.length > 20 || totals.rows[0].Size + attachments.reduce((sum, file) => sum + file.size, 0) > 15 * 1024 * 1024) {
+      await client.query("ROLLBACK"); return "attachment-limits" as const;
+    }
+    for (const file of attachments) {
+      await client.query(`INSERT INTO "DATA_ServiceRequestAttachments" ("ServiceRequestId", "Name", "Size", "MimeType", "Content", "CreatedBy", "CreatedDate") VALUES ($1, $2, $3, $4, $5, $6, now())`, [request.rows[0].Id, file.name, file.size, file.mimeType ?? "", file.contentBase64 ? Buffer.from(file.contentBase64, "base64") : null, updatedBy]);
+    }
+    await client.query(`INSERT INTO "DATA_ServiceRequestActivities" ("ServiceRequestId", "Actor", "Action", "Detail", "CreatedBy", "CreatedDate") VALUES ($1, $2, 'Attachments uploaded', $3, $4, now())`, [request.rows[0].Id, actor, `${attachments.length} file${attachments.length === 1 ? "" : "s"} uploaded`, updatedBy]);
+    await client.query("COMMIT");
+    return "ok" as const;
+  } catch (error) { await client.query("ROLLBACK"); throw error; }
+  finally { client.release(); }
+}
+
 export async function updateServiceRequestStatus(id: string, status: string, reviewComment: string, actor: string, updatedBy: string, picId: number | null = null, priority: string | null = null) {
   const client = await getPool().connect();
   try {
@@ -158,7 +185,7 @@ export async function updateServiceRequestStatus(id: string, status: string, rev
     const allowed: Record<string, string[]> = {
       Draft: ["Submitted", "Cancelled"], Submitted: ["In Review", "Cancelled"], "In Review": ["Approved", "Rejected", "Returned", "On Hold"],
       Approved: ["In Progress", "On Hold", "Cancelled"], "In Progress": ["Done", "On Hold", "Cancelled"], "On Hold": ["In Review", "Approved", "In Progress", "Cancelled"],
-      Rejected: [], Returned: ["Submitted"], Done: [], Cancelled: [],
+      Rejected: [], Returned: [], Done: [], Cancelled: [],
     };
     if (status !== oldStatus && !allowed[oldStatus]?.includes(status)) { await client.query("ROLLBACK"); return "invalid-transition" as const; }
     await client.query(`UPDATE "DATA_ServiceRequests" SET "Status" = $2, "ReviewComment" = CASE WHEN $3 <> '' THEN $3 ELSE "ReviewComment" END, "PICId" = COALESCE($5, "PICId"), "Priority" = COALESCE($6, "Priority"), "UpdatedBy" = $4, "UpdatedDate" = now() WHERE "Id" = $1`, [current.rows[0].Id, status, reviewComment, updatedBy, picId, priority]);

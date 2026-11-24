@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bold, Code2, ImagePlus, Italic, List, ListOrdered } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 
 const ALLOWED_TAGS = new Set(["p", "div", "br", "strong", "b", "em", "i", "ul", "ol", "li", "blockquote", "pre", "code"]);
 
@@ -27,12 +28,15 @@ type RichTextEditorProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  mentionOptions?: SearchSelectOption[];
+  toolbarHint?: string;
 };
 
-export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, placeholder, mentionOptions, toolbarHint }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [imageError, setImageError] = useState("");
+  const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -86,14 +90,16 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
 
   return (
     <div className="overflow-hidden rounded-lg border border-input bg-background focus-within:ring-3 focus-within:ring-ring/30">
-      <div className="flex items-center gap-1 border-b bg-muted/30 px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-1 border-b bg-muted/30 px-2 py-1.5">
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Bold" title="Bold" onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("bold")}><Bold /></Button>
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Italic" title="Italic" onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("italic")}><Italic /></Button>
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Bullet list" title="Bullet list" onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("insertUnorderedList")}><List /></Button>
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Numbered list" title="Numbered list" onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("insertOrderedList")}><ListOrdered /></Button>
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Insert code block" title="Insert code block" onMouseDown={(event) => event.preventDefault()} onClick={insertCodeBlock}><Code2 /></Button>
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Attach image" title="Attach image" onMouseDown={(event) => event.preventDefault()} onClick={() => imageInputRef.current?.click()}><ImagePlus /></Button>
+        {mentionOptions?.length ? mentionPickerOpen ? <SearchSelect id="rich-text-mention" className="w-48" options={mentionOptions} value={null} onValueChange={(value) => { const option = mentionOptions.find((item) => item.value === value); if (!option) return; editorRef.current?.focus(); document.execCommand("insertText", false, `@${option.label} `); if (editorRef.current) onChange(sanitizeRichText(editorRef.current.innerHTML)); setMentionPickerOpen(false); }} placeholder="Search people..." emptyText="No users found." /> : <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onMouseDown={(event) => event.preventDefault()} onClick={() => setMentionPickerOpen(true)}>@ Mention</Button> : null}
         <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => { void attachImage(event.target.files?.[0]); event.currentTarget.value = ""; }} />
+        {toolbarHint ? <span className="ml-auto px-2 text-[10px] text-muted-foreground">{toolbarHint}</span> : null}
       </div>
       <div
         ref={editorRef}

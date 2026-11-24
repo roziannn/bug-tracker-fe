@@ -15,7 +15,6 @@ import type { Project } from "@/types";
 
 type AttachmentDraft = { name: string; size: number; mimeType: string; id: string; contentBase64: string };
 const requestTypes = ["New Feature", "Enhancement", "Data/Report Request", "Lainnya"];
-const priorities = ["Low", "Medium", "High", "Critical"];
 
 function sizeLabel(size: number) { return size >= 1048576 ? `${(size / 1048576).toFixed(1)} MB` : size >= 1024 ? `${Math.round(size / 1024)} KB` : `${size} B`; }
 function readBase64(file: File) {
@@ -32,7 +31,6 @@ export function ServiceRequestFormPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("New Feature");
-  const [priority, setPriority] = useState("Medium");
   const [projectId, setProjectId] = useState("");
   const [justification, setJustification] = useState("");
   const [targetDate, setTargetDate] = useState("");
@@ -72,7 +70,7 @@ export function ServiceRequestFormPage() {
     }
     setSaving(true);
     try {
-      const response = await fetch("/api/service-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, title, description, type, priority, projectId: projectId || null, businessJustification: justification, requestedTargetDate: targetDate || null, attachments: attachments.map(({ name, size, mimeType, contentBase64 }) => ({ name, size, mimeType, contentBase64 })) }) });
+      const response = await fetch("/api/service-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, title, description, type, priority: "Medium", projectId: projectId || null, businessJustification: justification, requestedTargetDate: targetDate || null, attachments: attachments.map(({ name, size, mimeType, contentBase64 }) => ({ name, size, mimeType, contentBase64 })) }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? "Unable to create service request");
       appToast.success({ title: status === "Draft" ? "Draft saved" : "Request submitted", description: "Your service request was saved." });
@@ -83,10 +81,9 @@ export function ServiceRequestFormPage() {
 
   return <AppShell activeNav="service-requests" breadcrumbs={[{ label: "Service Requests", href: "/service-requests" }, { label: "New request" }]} eyebrow="Request intake" title="New Service Request" toolbar={<div><h2 className="text-lg font-semibold">New request</h2><p className="text-sm text-muted-foreground">Describe the business need and who should deliver it.</p></div>}>
     <form className="grid gap-6" onSubmit={(event) => { event.preventDefault(); void submit("Submitted"); }}>
-      <Card><CardHeader><CardTitle>Request details</CardTitle><CardDescription>Summarize what is needed and select its type and priority.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-[2fr_1fr_1fr]">
+      <Card><CardHeader><CardDescription>Summarize what is needed and select its type.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-[2fr_1fr]">
         <div className="grid min-w-0 gap-2"><Label htmlFor="sr-title">Title *</Label><Input id="sr-title" maxLength={255} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What do you need?" /></div>
         <div className="grid min-w-0 gap-2"><Label>Type</Label><Select value={type} onValueChange={(v) => v && setType(v)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{requestTypes.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
-        <div className="grid min-w-0 gap-2"><Label>Priority</Label><Select value={priority} onValueChange={(v) => v && setPriority(v)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{priorities.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
         <div className="grid gap-2 md:col-span-3"><Label htmlFor="sr-description">Description *</Label><Textarea id="sr-description" rows={5} maxLength={10000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the requested change, data, or outcome." /></div>
       </CardContent></Card>
       <Card><CardHeader><CardTitle>Business case & planning</CardTitle><CardDescription>Explain why it is needed and when you hope to receive it.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
