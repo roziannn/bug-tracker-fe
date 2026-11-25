@@ -173,3 +173,13 @@ export async function setTeamMemberActive(
   );
   return rows[0] ? (await getMemberById(memberId))! : "member-not-found";
 }
+
+export async function deleteTeamMember(teamNewId: string, memberId: number): Promise<"deleted" | MemberError> {
+  const teamId = await teamIdOf(teamNewId);
+  if (teamId === null) return "team-not-found";
+  const rows = await query(
+    `DELETE FROM "CORE_TeamMember" WHERE "Id" = $1 AND "TeamId" = $2 RETURNING "Id"`,
+    [memberId, teamId]
+  );
+  return rows[0] ? "deleted" : "member-not-found";
+}

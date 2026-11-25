@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { setTeamMemberActive, updateTeamMember } from "@/repositories/team.repository";
+import { deleteTeamMember, setTeamMemberActive, updateTeamMember } from "@/repositories/team.repository";
 import { ok, fail, handleError, isGuid, parseId } from "@/lib/api";
 import { memberErrorResponse } from "@/lib/team-api";
 import { getSession } from "@/lib/auth";
@@ -41,6 +41,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const session = await getSession();
     const result = await setTeamMemberActive(id, memberId, parsed.data.isActive, session?.email ?? "System");
     return typeof result === "string" ? memberErrorResponse(result) : ok(result);
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  try {
+    const { id, memberId: rawMemberId } = await params;
+    const memberId = parseId(rawMemberId);
+    if (!isGuid(id)) return fail("Group team not found", 404);
+    if (!memberId) return fail("Invalid id", 400);
+    const result = await deleteTeamMember(id, memberId);
+    return result === "deleted" ? ok({ deleted: true }) : memberErrorResponse(result);
   } catch (err) {
     return handleError(err);
   }

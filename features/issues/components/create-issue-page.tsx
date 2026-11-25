@@ -286,9 +286,6 @@ export function CreateIssuePage({ issueId: editIssueId }: { issueId?: string } =
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="destructive">Tier-aware intake</Badge>
-            <Badge variant="outline">Attachment ready</Badge>
-            <Badge variant="secondary">Project routing</Badge>
             <Button type="button" variant="outline" size="sm" onClick={startTour}>
               <CircleHelp />
               Take a tour

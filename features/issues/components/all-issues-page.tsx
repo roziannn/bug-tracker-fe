@@ -2,7 +2,7 @@
 
   import Link from "next/link";
   import { useEffect, useMemo, useState } from "react";
-  import { ArrowDown, ArrowUp, Download, Equal, Eye, ListFilter, Pencil, Plus, Search, ShieldAlert, TimerReset, TriangleAlert } from "lucide-react";
+  import { ArrowDown, ArrowUp, Download, Equal, ListFilter, Plus, Search, ShieldAlert, TimerReset, TriangleAlert } from "lucide-react";
 
   import { AppShell } from "@/components/layout/app-shell";
   import { Badge } from "@/components/ui/badge";
@@ -338,23 +338,22 @@
               <Table className="table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[10%]">Ticket ID</TableHead>
-                    <TableHead className="w-[28%]">Title</TableHead>
-                    <TableHead className="w-[10%]">Label</TableHead>
-                    <TableHead className="w-[10%]">Project</TableHead>
-                    <TableHead className="w-[12%]">Status</TableHead>
-                    <TableHead className="w-[10%]">Priority</TableHead>
+                    <TableHead className="w-[12%]">Ticket ID</TableHead>
+                    <TableHead className="w-[30%]">Title</TableHead>
+                    <TableHead className="w-[11%]">Label</TableHead>
+                    <TableHead className="w-[11%]">Project</TableHead>
+                    <TableHead className="w-[13%]">Status</TableHead>
+                    <TableHead className="w-[11%]">Priority</TableHead>
                     <TableHead className="w-[12%]">Created date</TableHead>
-                    <TableHead className="w-[8%]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {issues === null ? (
-                    <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">Loading issues...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">Loading issues...</TableCell></TableRow>
                   ) : paginatedIssues.length ? (
                     paginatedIssues.map((issue) => (
                       <TableRow key={issue.id}>
-                        <TableCell className="font-medium whitespace-normal break-words">{issue.id}</TableCell>
+                        <TableCell className="font-medium whitespace-normal break-words"><Link className="text-primary hover:underline" href={`/issues/${issue.detailId ?? issue.id}${issue.status === "Draft" ? "/edit" : ""}`}>{issue.id}</Link></TableCell>
                         <TableCell className="min-w-0">
                           <p className="truncate font-medium" title={issue.title}>{issue.title}</p>
                         </TableCell>
@@ -376,17 +375,11 @@
                         <TableCell className="text-muted-foreground whitespace-normal">
                           {formatDate(issue.createdAt)}
                         </TableCell>
-                        <TableCell className="whitespace-normal">
-                          <div className="flex gap-2">
-                            <Button nativeButton={false} render={<Link href={`/issues/${issue.detailId ?? issue.id}`} />} size="sm" variant="outline"><Eye /></Button>
-                            <Button nativeButton={false} render={<Link href={`/issues/${issue.detailId ?? issue.id}/edit`} />} size="icon-sm" variant="outline" aria-label={`Edit ${issue.id}`}><Pencil /></Button>
-                          </div>
-                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                         No issues match the current filters.
                       </TableCell>
                     </TableRow>

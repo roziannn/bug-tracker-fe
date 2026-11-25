@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Save, UserPlus } from "lucide-react";
+import { Pencil, Plus, Save, Trash2, UserPlus } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,7 @@ import type { Category, Paged, Team, TeamMember, User } from "@/types";
 const PAGE_SIZE = 10;
 const COLUMNS = 7;
 type Draft = { id: string | null; domainId: string | null; leadId: string | null; isActive: boolean };
-type MemberDraft = { teamId: string | null; userId: string | null; accessLevel: AccessLevel };
+type MemberDraft = { userId: string | null; accessLevel: AccessLevel };
 
 export function TeamsPage() {
   // null = masih dimuat
@@ -34,10 +34,11 @@ export function TeamsPage() {
   const [domains, setDomains] = useState<Category[] | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
-  const [memberDraft, setMemberDraft] = useState<MemberDraft | null>(null);
-  const [memberUsers, setMemberUsers] = useState<User[] | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [savingMember, setSavingMember] = useState(false);
+  const [memberDraft, setMemberDraft] = useState<MemberDraft>({ userId: null, accessLevel: DEFAULT_ACCESS_LEVEL });
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [memberBusyId, setMemberBusyId] = useState<number | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
 
   useEffect(() => {
     requestJson<Paged<User>>("/api/users?pageSize=100").then((body) => setUsers(body.data.filter((user) => user.IsActive))).catch(() => setUsers([]));
@@ -60,8 +61,7 @@ export function TeamsPage() {
   const paginatedTeams = allTeams.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const domainOptions = (domains ?? []).filter((domain) => !allTeams.some((team) => team.DomainId === domain.Id && team.NewId !== draft?.id) && (domain.IsActive || allTeams.some((team) => team.NewId === draft?.id && team.DomainId === domain.Id))).map((domain) => ({ value: String(domain.Id), label: domain.Name }));
   const currentTeam = allTeams.find((team) => team.NewId === draft?.id);
-  const selectedMemberTeam = allTeams.find((team) => team.NewId === memberDraft?.teamId);
-  const memberUserOptions = (memberUsers ?? []).filter((user) => !teamMembers.some((member) => member.UserId === user.Id)).map((user) => ({ value: String(user.Id), label: user.Name, description: user.RoleName ? `${user.Email} · ${user.RoleName}` : user.Email }));
+  const memberUserOptions = (users ?? []).filter((user) => !teamMembers.some((member) => member.UserId === user.Id)).map((user) => ({ value: String(user.Id), label: user.Name, description: user.RoleName ? `${user.Email} · ${user.RoleName}` : user.Email }));
   const leadOptions = (users ?? []).map((user) => ({ value: String(user.Id), label: user.Name, description: user.RoleName ? `${user.Email} · ${user.RoleName}` : user.Email }));
   if (currentTeam && users && !leadOptions.some((option) => option.value === String(currentTeam.LeadId))) leadOptions.push({ value: String(currentTeam.LeadId), label: currentTeam.LeadName, description: "Inactive user" });
 
@@ -82,39 +82,49 @@ export function TeamsPage() {
     } finally { setSaving(false); }
   }
 
-  async function openAddMember() {
-    setMemberDraft({ teamId: allTeams[0]?.NewId ?? null, userId: null, accessLevel: DEFAULT_ACCESS_LEVEL });
-    setMemberUsers(null);
+  async function openEdit(team: Team) {
+    setDraft({ id: team.NewId, domainId: String(team.DomainId), leadId: String(team.LeadId), isActive: team.IsActive });
+    setMembersLoading(true);
     setTeamMembers([]);
-    try {
-      const [userBody, teamMemberList] = await Promise.all([
-        requestJson<Paged<User>>("/api/users?pageSize=100"),
-        allTeams[0] ? requestJson<TeamMember[]>(`/api/teams/${allTeams[0].NewId}/members`) : Promise.resolve([]),
-      ]);
-      setMemberUsers(userBody.data.filter((user) => user.IsActive));
-      setTeamMembers(teamMemberList);
-    } catch (err) {
-      setMemberUsers([]);
-      appToast.error({ title: "Failed to load member options", description: err instanceof Error ? err.message : undefined });
-    }
+    setMemberDraft({ userId: null, accessLevel: DEFAULT_ACCESS_LEVEL });
+    try { setTeamMembers(await requestJson<TeamMember[]>(`/api/teams/${team.NewId}/members`)); }
+    catch (err) { appToast.error({ title: "Failed to load team members", description: err instanceof Error ? err.message : undefined }); }
+    finally { setMembersLoading(false); }
   }
 
-  async function changeMemberTeam(teamId: string) {
-    setMemberDraft((draft) => draft ? { ...draft, teamId, userId: null } : draft);
-    try { setTeamMembers(await requestJson<TeamMember[]>(`/api/teams/${teamId}/members`)); }
-    catch (err) { setTeamMembers([]); appToast.error({ title: "Failed to load team members", description: err instanceof Error ? err.message : undefined }); }
+  async function addMember() {
+    if (!draft?.id || !memberDraft.userId) return;
+    try {
+      await requestJson(`/api/teams/${draft.id}/members`, "POST", { userId: Number(memberDraft.userId), accessLevel: memberDraft.accessLevel });
+      appToast.success({ title: "Member added" });
+      setTeamMembers(await requestJson<TeamMember[]>(`/api/teams/${draft.id}/members`));
+      setMemberDraft({ userId: null, accessLevel: DEFAULT_ACCESS_LEVEL });
+      setTeams(await requestJson<Team[]>("/api/teams"));
+    } catch (err) { appToast.error({ title: "Failed to add member", description: err instanceof Error ? err.message : undefined }); }
   }
 
-  async function saveMember() {
-    if (!memberDraft?.teamId || !memberDraft.userId || savingMember) return;
-    setSavingMember(true);
+  async function toggleMember(member: TeamMember) {
+    if (!draft?.id) return;
+    setMemberBusyId(member.Id);
     try {
-      await requestJson(`/api/teams/${memberDraft.teamId}/members`, "POST", { userId: Number(memberDraft.userId), accessLevel: memberDraft.accessLevel });
-      appToast.success({ title: "Member added", description: memberUserOptions.find((option) => option.value === memberDraft.userId)?.label });
-      setMemberDraft(null);
-    } catch (err) {
-      appToast.error({ title: "Failed to add member", description: err instanceof Error ? err.message : undefined });
-    } finally { setSavingMember(false); }
+      await requestJson(`/api/teams/${draft.id}/members/${member.Id}`, "PATCH", { isActive: !member.IsActive });
+      setTeamMembers(await requestJson<TeamMember[]>(`/api/teams/${draft.id}/members`));
+      setTeams(await requestJson<Team[]>("/api/teams"));
+    } catch (err) { appToast.error({ title: "Failed to update member", description: err instanceof Error ? err.message : undefined }); }
+    finally { setMemberBusyId(null); }
+  }
+
+  async function removeMember(member: TeamMember) {
+    if (!draft?.id) return;
+    setMemberBusyId(member.Id);
+    try {
+      await requestJson(`/api/teams/${draft.id}/members/${member.Id}`, "DELETE");
+      appToast.success({ title: "Member removed", description: member.Name });
+      setTeamMembers(await requestJson<TeamMember[]>(`/api/teams/${draft.id}/members`));
+      setTeams(await requestJson<Team[]>("/api/teams"));
+      setMemberToRemove(null);
+    } catch (err) { appToast.error({ title: "Failed to remove member", description: err instanceof Error ? err.message : undefined }); }
+    finally { setMemberBusyId(null); }
   }
 
   return (
@@ -129,10 +139,7 @@ export function TeamsPage() {
             <p className="text-sm text-muted-foreground">See each group team, its lead and members, and manage them from here.</p>
           </div>
 
-          <div className="flex gap-2">
-            <Button onClick={openAddMember} size="lg" variant="outline"><UserPlus /> Add member</Button>
-            <Button onClick={() => setDraft({ id: null, domainId: null, leadId: null, isActive: true })} size="lg"><Plus /> Create group</Button>
-          </div>
+          <Button onClick={() => setDraft({ id: null, domainId: null, leadId: null, isActive: true })} size="lg"><Plus /> Create group</Button>
         </div>
       }
     >
@@ -170,7 +177,7 @@ export function TeamsPage() {
                       <TableCell className="text-muted-foreground">{formatDate(team.CreatedDate)}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button onClick={() => setDraft({ id: team.NewId, domainId: String(team.DomainId), leadId: String(team.LeadId), isActive: team.IsActive })} size="sm" variant="outline"><Pencil className="mr-2 size-4" />Edit</Button>
+                          <Button onClick={() => openEdit(team)} size="sm" variant="outline"><Pencil className="mr-2 size-4" />Edit</Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -201,19 +208,29 @@ export function TeamsPage() {
             <div className="grid gap-2"><Label htmlFor="team-domain">Domain</Label><Select value={draft.domainId} items={domainOptions} disabled={domains === null} onValueChange={(value) => setDraft({ ...draft, domainId: value })}><SelectTrigger id="team-domain" className="w-full"><SelectValue placeholder={domains === null ? "Loading domains..." : "Select a domain"} /></SelectTrigger><SelectContent>{domainOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
             <div className="grid gap-2"><Label htmlFor="team-lead">Lead</Label><SearchSelect id="team-lead" options={leadOptions} value={draft.leadId} onValueChange={(value) => setDraft({ ...draft, leadId: value })} placeholder={users === null ? "Loading users..." : "Search a user by name or email"} emptyText="No users found." disabled={users === null} /></div>
             {draft.id ? <div className="flex items-center justify-between"><Label htmlFor="team-active">Active</Label><button id="team-active" type="button" role="switch" aria-checked={draft.isActive} onClick={() => setDraft({ ...draft, isActive: !draft.isActive })} className={cn("relative h-5 w-9 rounded-full transition-colors", draft.isActive ? "bg-primary" : "bg-muted-foreground/30")}><span className={cn("absolute top-0.5 left-0.5 size-4 rounded-full bg-background transition-transform", draft.isActive && "translate-x-4")} /></button></div> : null}
+            {draft.id ? <div className="grid gap-3 border-t pt-4">
+              <div><h3 className="text-sm font-semibold">Members</h3><p className="text-xs text-muted-foreground">Manage who belongs to this group and their active status.</p></div>
+              {membersLoading ? <p className="text-sm text-muted-foreground">Loading members...</p> : teamMembers.length ? <div className="max-h-52 divide-y overflow-y-auto rounded-md border">{teamMembers.map((member) => <div key={member.Id} className="flex items-center justify-between gap-3 p-2.5">
+                <div className="min-w-0"><p className="truncate text-sm font-medium">{member.Name}</p><p className="truncate text-xs text-muted-foreground">{member.Email}</p></div>
+                <div className="flex shrink-0 items-center gap-2"><Badge variant={member.IsActive ? "secondary" : "outline"}>{member.IsActive ? "Active" : "Inactive"}</Badge><button type="button" role="switch" aria-checked={member.IsActive} aria-label={`${member.IsActive ? "Deactivate" : "Activate"} ${member.Name}`} disabled={memberBusyId === member.Id} onClick={() => toggleMember(member)} className={cn("relative h-5 w-9 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50", member.IsActive ? "bg-primary" : "bg-muted-foreground/30")}><span className={cn("absolute top-0.5 left-0.5 size-4 rounded-full bg-background transition-transform", member.IsActive && "translate-x-4")} /></button><Button size="icon" variant="ghost" aria-label={`Remove ${member.Name}`} disabled={memberBusyId === member.Id} onClick={() => setMemberToRemove(member)}><Trash2 className="size-4" /></Button></div>
+              </div>)}</div> : <p className="text-sm text-muted-foreground">No members yet.</p>}
+              <div className="flex items-end gap-2"><div className="grid min-w-0 flex-1 gap-2"><Label htmlFor="member-user">Add member</Label><SearchSelect id="member-user" options={memberUserOptions} value={memberDraft.userId} onValueChange={(value) => setMemberDraft({ ...memberDraft, userId: value })} placeholder={users === null ? "Loading users..." : "Search a user by name or email"} emptyText="Everyone is already in this team." disabled={users === null || membersLoading} /></div><Button onClick={addMember} disabled={!memberDraft.userId || membersLoading}><UserPlus />Add</Button></div>
+            </div> : null}
           </div> : null}
           <DialogFooter showCloseButton><Button onClick={saveDraft} disabled={!draft?.domainId || !draft.leadId || saving || domains === null || users === null}>{draft?.id ? <Save /> : <Plus />}{saving ? "Saving..." : draft?.id ? "Save group" : "Create group"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog open={memberDraft !== null} onOpenChange={(open) => !open && setMemberDraft(null)}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader><DialogTitle>Add member</DialogTitle><DialogDescription>Choose a group team, a person, and their access level.</DialogDescription></DialogHeader>
-          {memberDraft ? <div className="grid gap-4">
-            <div className="grid gap-2"><Label htmlFor="member-team">Group team</Label><Select value={memberDraft.teamId} items={allTeams.map((team) => ({ value: team.NewId, label: team.DomainName }))} onValueChange={changeMemberTeam}><SelectTrigger id="member-team" className="w-full"><SelectValue placeholder="Select a group team" /></SelectTrigger><SelectContent>{allTeams.map((team) => <SelectItem key={team.NewId} value={team.NewId}>{team.DomainName}</SelectItem>)}</SelectContent></Select></div>
-            <div className="grid gap-2"><Label htmlFor="member-user">User</Label><SearchSelect id="member-user" options={memberUserOptions} value={memberDraft.userId} onValueChange={(value) => setMemberDraft({ ...memberDraft, userId: value })} placeholder={memberUsers === null ? "Loading users..." : "Search a user by name or email"} emptyText="Everyone is already in this team." disabled={memberUsers === null || !memberDraft.teamId} /></div>
-            <div className="grid gap-2"><Label htmlFor="member-access">Access level</Label><Select value={memberDraft.accessLevel} items={ACCESS_LEVELS.map((level) => ({ value: level, label: ACCESS_LEVEL_LABELS[level] }))} onValueChange={(value) => setMemberDraft({ ...memberDraft, accessLevel: value as AccessLevel })}><SelectTrigger id="member-access" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{ACCESS_LEVELS.map((level) => <SelectItem key={level} value={level}>{ACCESS_LEVEL_LABELS[level]}</SelectItem>)}</SelectContent></Select></div>
-          </div> : null}
-          <DialogFooter showCloseButton><Button onClick={saveMember} disabled={!memberDraft?.teamId || !memberDraft.userId || savingMember || memberUsers === null || allTeams.length === 0}><UserPlus />{savingMember ? "Adding..." : "Add member"}</Button></DialogFooter>
+      <Dialog open={memberToRemove !== null} onOpenChange={(open) => !open && memberBusyId === null && setMemberToRemove(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Remove team member?</DialogTitle>
+            <DialogDescription>{memberToRemove ? `${memberToRemove.Name} will be removed from this group team.` : "This member will be removed from the group team."}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter showCloseButton>
+            <Button variant="destructive" disabled={memberBusyId !== null} onClick={() => memberToRemove && removeMember(memberToRemove)}>
+              <Trash2 />{memberBusyId === memberToRemove?.Id ? "Removing..." : "Remove member"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppShell>
