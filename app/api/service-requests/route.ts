@@ -2,9 +2,14 @@ import { NextRequest } from "next/server";
 import { fail, handleError, ok } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { parseDateOnly } from "@/lib/date";
+import { notifyServiceRequestPic } from "@/lib/services/service-request-notification.service";
 import { listServiceRequests, createServiceRequest, SERVICE_REQUEST_PRIORITIES, SERVICE_REQUEST_TYPES } from "@/repositories/service-request.repository";
 
 export const dynamic = "force-dynamic";
+
+function hasText(value: string) {
+  return value.replace(/<[^>]*>/g, " ").replace(/&nbsp;|&#160;/gi, " ").trim().length > 0;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +27,7 @@ export async function POST(request: NextRequest) {
     const description = typeof body.description === "string" ? body.description.trim() : "";
     const businessJustification = typeof body.businessJustification === "string" ? body.businessJustification.trim() : "";
     if (title.length > 255 || description.length > 10000 || businessJustification.length > 5000) return fail("One or more fields exceed the allowed length", 400);
-    if (body.status === "Submitted" && (!title || !description || !businessJustification || !body.projectId)) return fail("Complete the required fields before submitting", 400);
+    if (body.status === "Submitted" && (!title || !hasText(description) || !hasText(businessJustification) || !body.projectId)) return fail("Complete the required fields before submitting", 400);
     if (body.requestedTargetDate && (typeof body.requestedTargetDate !== "string" || parseDateOnly(body.requestedTargetDate) === null)) return fail("Requested target date is invalid", 400);
     const attachments: { name: string; size: number; mimeType?: string; contentBase64?: string }[] = [];
     if (Array.isArray(body.attachments)) {
@@ -34,16 +39,18 @@ export async function POST(request: NextRequest) {
     if (attachments.reduce((total, file) => total + file.size, 0) > 15 * 1024 * 1024) return fail("Attachments must total 15 MB or less", 400);
     const session = await getSession();
     if (!session) return fail("Unauthorized", 401);
+    const picId = Number.isInteger(body.picId) ? body.picId : null;
     const result = await createServiceRequest({
       title, description, type: body.type, priority: body.priority,
       projectId: typeof body.projectId === "string" ? body.projectId : null,
-      picId: Number.isInteger(body.picId) ? body.picId : null,
+      picId,
       businessJustification,
       requestedTargetDate: typeof body.requestedTargetDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.requestedTargetDate) ? body.requestedTargetDate : null,
       estimatedEffort: typeof body.estimatedEffort === "string" ? body.estimatedEffort.slice(0, 100) : "",
       status: body.status, attachments,
     }, session.userId, session.name, session.email);
     if ("error" in result) return fail(result.error ?? "Unable to create request", 400);
+    if (body.status === "Submitted" && picId) await notifyServiceRequestPic(result.id, picId, session.name);
     return ok(result, 201);
   } catch (error) { return handleError(error); }
 }

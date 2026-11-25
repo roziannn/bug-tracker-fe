@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AlignLeft, ArrowLeft, ArrowRight, CalendarDays, ChartNoAxesColumn, Check, CheckCircle2, CircleDot, CircleX, ClipboardCheck, ClipboardList, Download, ExternalLink, FileUp, FolderKanban, History, MessageSquare, Pause, Paperclip, Reply, RotateCcw, Save, Send, SquarePen, Trash2, UserRound, X, XCircle } from "lucide-react";
+import { AlignLeft, ArrowLeft, ArrowRight, CalendarDays, ChartNoAxesColumn, Check, CheckCircle2, CircleAlert, CircleDot, CircleX, ClipboardCheck, ClipboardList, Download, ExternalLink, FileUp, FolderKanban, History, MessageSquare, Pause, Paperclip, Reply, RotateCcw, Save, Send, SquarePen, Trash2, UserRound, X, XCircle } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/components/app/user-provider";
 import { RichTextEditor, sanitizeRichText } from "@/components/ui/rich-text-editor";
 import { MentionText, MentionTextarea } from "@/features/issues/components/database-issue-detail-page";
@@ -120,6 +119,8 @@ export function ServiceRequestDetailPage({ id }: { id: string }) {
   const [picDialogOpen, setPicDialogOpen] = useState(false);
   const [progressPicId, setProgressPicId] = useState("");
   const [progressPriority, setProgressPriority] = useState("");
+  const [activeTab, setActiveTab] = useState("overview");
+  const [reviewFlowOpen, setReviewFlowOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -213,7 +214,7 @@ export function ServiceRequestDetailPage({ id }: { id: string }) {
   async function saveDraft(submit: boolean) {
     if (!request) return;
     const selectedProject = projects.find((project) => project.Name === draftProjectName);
-    if (submit && (!draftTitle.trim() || !draftDescription.trim() || !draftJustification.trim() || !selectedProject)) {
+    if (submit && (!draftTitle.trim() || !plainText(draftDescription) || !plainText(draftJustification) || !selectedProject)) {
       appToast.error({ title: "Complete required fields", description: "Title, description, business justification, and project are required to submit." });
       return;
     }
@@ -296,13 +297,13 @@ export function ServiceRequestDetailPage({ id }: { id: string }) {
         <section className="min-w-0 border-b px-4 py-3 xl:border-r xl:border-b-0"><p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assigned PIC</p><div className="flex min-w-0 items-center gap-2"><UserRound className="size-4 shrink-0 text-muted-foreground" /><span className="truncate text-sm font-medium">{request.pic ?? "—"}</span></div></section>
         <section className="min-w-0 px-4 py-3"><p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Requested Target</p><div className="flex items-center gap-2"><CalendarDays className="size-4 shrink-0 text-muted-foreground" /><span className="text-sm font-medium">{request.requestedTargetDate ?? "—"}</span></div></section>
       </CardContent></Card>
-      <Tabs defaultValue="overview" className="gap-0 lg:col-span-2">
-        <div className="border-b"><div className="overflow-x-auto"><TabsList variant="line" className="h-10 w-max min-w-full items-stretch justify-start gap-6 rounded-none border-0 bg-transparent p-0">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value)} className="gap-0 lg:col-span-2">
+        <div className="flex min-w-0 items-center gap-3 border-b"><div className="min-w-0 flex-1 overflow-x-auto"><TabsList variant="line" className="h-10 w-max min-w-full items-stretch justify-start gap-6 rounded-none border-0 bg-transparent p-0">
           <TabsTrigger value="overview" className="h-full flex-none cursor-pointer items-center justify-start gap-2 rounded-none px-1 text-sm font-medium text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary data-active:shadow-none after:inset-x-0 after:bottom-0! after:h-0.5 after:rounded-full after:bg-primary after:opacity-0 data-active:after:opacity-100 [&_svg]:size-4 [&_svg]:shrink-0"><ClipboardList />Overview</TabsTrigger>
           {request.status !== "Draft" ? <TabsTrigger value="review" className="h-full flex-none cursor-pointer items-center justify-start gap-2 rounded-none px-1 text-sm font-medium text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary data-active:shadow-none after:inset-x-0 after:bottom-0! after:h-0.5 after:rounded-full after:bg-primary after:opacity-0 data-active:after:opacity-100 [&_svg]:size-4 [&_svg]:shrink-0"><Check />Review &amp; Approval{request.status === "Submitted" || request.status === "In Review" ? <Badge variant="secondary" className="ml-1 bg-amber-100 px-1.5 py-0 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">Pending</Badge> : null}</TabsTrigger> : null}
           <TabsTrigger value="discussion" className="h-full flex-none cursor-pointer items-center justify-start gap-2 rounded-none px-1 text-sm font-medium text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary data-active:shadow-none after:inset-x-0 after:bottom-0! after:h-0.5 after:rounded-full after:bg-primary after:opacity-0 data-active:after:opacity-100 [&_svg]:size-4 [&_svg]:shrink-0"><MessageSquare />Discussion <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{request.comments.length}</span></TabsTrigger>
           <TabsTrigger value="activity" className="h-full flex-none cursor-pointer items-center justify-start gap-2 rounded-none px-1 text-sm font-medium text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-primary data-active:shadow-none after:inset-x-0 after:bottom-0! after:h-0.5 after:rounded-full after:bg-primary after:opacity-0 data-active:after:opacity-100 [&_svg]:size-4 [&_svg]:shrink-0"><History />Activity</TabsTrigger>
-        </TabsList></div></div>
+        </TabsList></div>{request.status !== "Draft" && activeTab === "review" ? <Button type="button" variant="ghost" size="icon-sm" className="mr-2 shrink-0 rounded-full text-muted-foreground hover:text-primary" aria-label="Explain the review workflow" title="Review workflow" onClick={() => setReviewFlowOpen(true)}><CircleAlert className="size-4" /></Button> : null}</div>
         <div className="pt-5 pb-5">
           <TabsContent value="overview" className="space-y-5">
             {isEditableRequest ? <div className="space-y-5">
@@ -310,10 +311,10 @@ export function ServiceRequestDetailPage({ id }: { id: string }) {
               <Card><CardHeader><CardTitle>Request details</CardTitle><p className="text-sm text-muted-foreground">Update the request title, type, and description.</p></CardHeader><CardContent className="grid gap-4 md:grid-cols-[2fr_2fr]">
                 <div className="grid min-w-0 gap-2"><Label htmlFor="draft-title">Title *</Label><Input id="draft-title" maxLength={255} value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} /></div>
                 <div className="grid min-w-0 gap-2"><Label>Type</Label><Select value={draftType} onValueChange={(value) => value && setDraftType(value)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{requestTypes.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
-                <div className="grid gap-2 md:col-span-3"><Label htmlFor="draft-description">Description *</Label><Textarea id="draft-description" rows={5} maxLength={10000} value={draftDescription} onChange={(e) => setDraftDescription(e.target.value)} /></div>
+                <div className="grid gap-2 md:col-span-3"><Label>Description *</Label><RichTextEditor value={draftDescription} onChange={setDraftDescription} placeholder="Describe the requested change, data, or outcome." /></div>
               </CardContent></Card>
               <Card><CardHeader><CardTitle>Business case &amp; planning</CardTitle><p className="text-sm text-muted-foreground">Explain the business need and select the project and PIC.</p></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2"><Label htmlFor="draft-justification">Business justification *</Label><Textarea id="draft-justification" className="min-h-28" maxLength={5000} value={draftJustification} onChange={(e) => setDraftJustification(e.target.value)} /></div>
+                <div className="grid gap-2"><Label>Business justification *</Label><RichTextEditor value={draftJustification} onChange={setDraftJustification} placeholder="Why is this needed? What benefit or impact will it have?" /></div>
                 <div className="grid gap-4">
                   <div className="grid gap-2"><Label>Project *</Label><Select value={draftProjectName} onValueChange={(value) => value && setDraftProjectName(value)}><SelectTrigger className="w-full"><SelectValue placeholder="Select project" /></SelectTrigger><SelectContent>{projects.map((project) => <SelectItem key={project.NewId} value={project.Name}>{project.Name}</SelectItem>)}</SelectContent></Select></div>
                   <div className="grid gap-2"><Label htmlFor="draft-target-date">Requested target date</Label><Input id="draft-target-date" type="date" value={draftTargetDate} onChange={(e) => setDraftTargetDate(e.target.value)} /></div>
@@ -328,10 +329,10 @@ export function ServiceRequestDetailPage({ id }: { id: string }) {
             </div> : <>
             <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,1fr)]">
               <div className="flex flex-col gap-5">
-                <Card className="flex-1 gap-0 overflow-hidden py-0"><CardHeader className="flex h-14 w-full shrink-0 flex-row items-center justify-between bg-muted/40 px-4 py-3"><CardTitle className="flex items-center gap-2 text-sm"><AlignLeft className="size-4 text-muted-foreground" />Description</CardTitle></CardHeader><CardContent className="p-4"><p className="whitespace-pre-wrap text-sm leading-6">{request.description || "No description provided."}</p></CardContent></Card>
-                <Card className="flex-1 gap-0 overflow-hidden py-0"><CardHeader className="flex h-14 w-full shrink-0 flex-row items-center justify-between bg-muted/40 px-4 py-3"><CardTitle className="flex items-center gap-2 text-sm"><ChartNoAxesColumn className="size-4 text-muted-foreground" />Business Justification</CardTitle></CardHeader><CardContent className="p-4"><p className="whitespace-pre-wrap text-sm leading-6">{request.businessJustification || "No business justification provided."}</p></CardContent></Card>
+                <Card className="flex-1 gap-0 overflow-hidden py-0"><CardHeader className="flex h-14 w-full shrink-0 flex-row items-center justify-between bg-muted/40 px-4 py-3"><CardTitle className="flex items-center gap-2 text-sm"><AlignLeft className="size-4 text-muted-foreground" />Description</CardTitle></CardHeader><CardContent className="p-4">{plainText(request.description) ? <div className="solution-content text-sm leading-6 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeRichText(request.description) }} /> : <p className="text-sm leading-6 text-muted-foreground">No description provided.</p>}</CardContent></Card>
+                <Card className="flex-1 gap-0 overflow-hidden py-0"><CardHeader className="flex h-14 w-full shrink-0 flex-row items-center justify-between bg-muted/40 px-4 py-3"><CardTitle className="flex items-center gap-2 text-sm"><ChartNoAxesColumn className="size-4 text-muted-foreground" />Business Justification</CardTitle></CardHeader><CardContent className="p-4">{plainText(request.businessJustification) ? <div className="solution-content text-sm leading-6 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: sanitizeRichText(request.businessJustification) }} /> : <p className="text-sm leading-6 text-muted-foreground">No business justification provided.</p>}</CardContent></Card>
               </div>
-              <Card className="h-full gap-0 overflow-hidden py-0"><CardHeader className="flex h-14 w-full shrink-0 flex-row items-center justify-between bg-muted/40 px-4 py-3"><CardTitle className="flex items-center gap-2 text-sm"><Paperclip className="size-4 text-muted-foreground" />Attachments <span className="text-xs font-normal text-muted-foreground">({request.attachments.length} files)</span></CardTitle><label title={uploadingAttachments ? "Uploading..." : "Upload file"} className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:underline has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50"><FileUp className="size-4" />Upload file<input type="file" multiple disabled={uploadingAttachments} className="sr-only" onChange={(event) => { void uploadRequestAttachments(event.currentTarget.files); event.currentTarget.value = ""; }} /></label></CardHeader><CardContent className="flex-1 space-y-2 p-4">{request.attachments.length ? request.attachments.map((file) => { const extension = file.name.split(".").pop()?.toUpperCase() || "FILE"; return <div key={file.id} className="flex min-w-0 items-center gap-3 rounded-lg border p-3"><span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/30 text-[9px] font-semibold text-muted-foreground">{extension.slice(0, 4)}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{file.name}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{formatSize(file.size)}</p></div><Button nativeButton={false} render={<a href={`/api/service-requests/${encodeURIComponent(id)}/attachments/${file.id}`} />} type="button" variant="ghost" size="icon-sm" aria-label={`Download ${file.name}`}><Download /></Button></div>; }) : <p className="py-8 text-center text-sm text-muted-foreground">No attachments yet.</p>}</CardContent></Card>
+              <Card className="h-fit self-start gap-0 overflow-hidden py-0"><CardHeader className="flex h-14 w-full shrink-0 flex-row items-center justify-between bg-muted/40 px-4 py-3"><CardTitle className="flex items-center gap-2 text-sm"><Paperclip className="size-4 text-muted-foreground" />Attachments <span className="text-xs font-normal text-muted-foreground">({request.attachments.length} files)</span></CardTitle><label title={uploadingAttachments ? "Uploading..." : "Upload file"} className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:underline has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50"><FileUp className="size-4" />Upload file<input type="file" multiple disabled={uploadingAttachments} className="sr-only" onChange={(event) => { void uploadRequestAttachments(event.currentTarget.files); event.currentTarget.value = ""; }} /></label></CardHeader><CardContent className="space-y-2 p-4">{request.attachments.length ? request.attachments.map((file) => { const extension = file.name.split(".").pop()?.toUpperCase() || "FILE"; return <div key={file.id} className="flex min-w-0 items-center gap-3 rounded-lg border p-3"><span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/30 text-[9px] font-semibold text-muted-foreground">{extension.slice(0, 4)}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{file.name}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{formatSize(file.size)}</p></div><Button nativeButton={false} render={<a href={`/api/service-requests/${encodeURIComponent(id)}/attachments/${file.id}`} />} type="button" variant="ghost" size="icon-sm" aria-label={`Download ${file.name}`}><Download /></Button></div>; }) : <p className="py-5 text-center text-sm text-muted-foreground">No attachments yet.</p>}</CardContent></Card>
             </div>
             </>}
           </TabsContent>
@@ -354,6 +355,25 @@ export function ServiceRequestDetailPage({ id }: { id: string }) {
           <TabsContent value="activity" className="space-y-3">{request.activities.length ? <ol className="ml-2 border-l border-border">{request.activities.map((activity, index) => <li key={activity.id} className={`relative pl-6 ${index < request.activities.length - 1 ? "pb-6" : ""}`}><span className="absolute top-1 left-[-5px] size-2.5 rounded-full border-2 border-background bg-primary" /><div className="flex flex-col gap-1 sm:flex-row sm:justify-between"><p className="text-sm font-semibold">{activity.action}<span className="ml-2 font-normal text-muted-foreground">by {activity.actor}</span></p><time className="text-xs text-muted-foreground">{formatDate(activity.createdAt)}</time></div>{activity.detail ? <p className="mt-1 text-sm text-muted-foreground"><ActivityDetail detail={activity.detail} /></p> : null}</li>)}</ol> : <p className="py-8 text-center text-sm text-muted-foreground"><History className="mx-auto mb-2 size-5" />No activity yet.</p>}</TabsContent>
         </div>
       </Tabs>
+      <Dialog open={reviewFlowOpen} onOpenChange={setReviewFlowOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><CircleAlert className="size-5 text-primary" />Service Request review flow</DialogTitle><DialogDescription>Follow the request from submission through delivery.</DialogDescription></DialogHeader>
+          <ol className="space-y-0">
+            {[
+              { title: "Submitted", description: "The requester submits the form. The review team can now check the request." },
+              { title: "In Review", description: "Reviewers add notes and choose the next decision." },
+              { title: "Approved", description: "The request is accepted and ready to be scheduled." },
+              { title: "In Progress", description: "A PIC and priority are assigned, and work begins." },
+              { title: "Done", description: "The work is complete and the request is closed." },
+            ].map((step, index, steps) => <li key={step.title} className="relative flex gap-3 pb-5 last:pb-0">
+              {index < steps.length - 1 ? <span className="absolute top-7 bottom-0 left-3.5 w-px bg-border" /> : null}
+              <span className="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border bg-background text-xs font-semibold text-primary">{index + 1}</span>
+              <div className="pt-0.5"><p className="text-sm font-semibold">{step.title}</p><p className="mt-0.5 text-sm text-muted-foreground">{step.description}</p></div>
+            </li>)}
+          </ol>
+          <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground"><p><span className="font-medium text-foreground">Returned:</span> The requester updates the form and submits it again, then it returns to review.</p><p className="mt-2"><span className="font-medium text-foreground">On Hold:</span> Work pauses until the reviewer resumes it. A request may also be rejected or cancelled.</p></div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={picDialogOpen} onOpenChange={setPicDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Assign PIC</DialogTitle><DialogDescription>Choose the person responsible for this service request before moving it to In Progress.</DialogDescription></DialogHeader>

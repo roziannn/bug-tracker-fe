@@ -169,7 +169,7 @@ function IssueCard({
       onDragStart={() => onDragStart(issue.id)}
       onDragEnd={onDragEnd}
       className={cn(
-        "cursor-grab border border-foreground/15 bg-card dark:bg-zinc-800 shadow-md transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg active:cursor-grabbing",
+        "cursor-grab gap-1 border border-foreground/15 bg-card dark:bg-zinc-800 shadow-md transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg active:cursor-grabbing",
         dragging && "scale-[0.97] opacity-50 ring-2 ring-primary/30",
         issue.inactive && "opacity-60 grayscale",
         issue.archived && "border-dashed bg-muted/70 opacity-70 grayscale hover:translate-y-0 hover:border-foreground/15 hover:shadow-md"
@@ -178,21 +178,16 @@ function IssueCard({
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <div>
-            <CardTitle className="flex items-center gap-1.5 text-sm">
-              {issue.completed ? (
-                <span
-                  aria-label="Completed"
-                  className="flex size-4 shrink-0 items-center justify-center rounded-full bg-lime-500 text-zinc-900"
-                >
-                  <Check className="size-2.5" strokeWidth={3.5} />
-                </span>
-              ) : null}
+            {issue.archived || issue.inactive ? <CardTitle className="flex items-center gap-1.5 text-sm">
               {issue.archived ? <span className="text-xs font-normal text-muted-foreground">Archived</span> : null}
               {issue.inactive ? <span className="text-xs font-normal text-muted-foreground">Inactive</span> : null}
-            </CardTitle>
-            <CardDescription className={cn("mt-1 leading-6", issue.archived ? "text-muted-foreground" : "text-foreground/90")}>
-              {issue.title}
-            </CardDescription>
+            </CardTitle> : null}
+            <div className={cn("flex min-w-0 items-center gap-2", (issue.archived || issue.inactive) && "mt-1")}>
+              {issue.completed ? <span aria-label="Completed" className="flex size-4 shrink-0 items-center justify-center rounded-full bg-lime-500 text-zinc-900"><Check className="size-2.5" strokeWidth={3.5} /></span> : null}
+              <CardDescription className={cn("min-w-0 leading-6", issue.archived ? "text-muted-foreground" : "text-foreground/90")}>
+                {issue.title}
+              </CardDescription>
+            </div>
           </div>
           <GripVertical className="mt-0.5 size-4 text-muted-foreground" />
         </div>
@@ -779,10 +774,10 @@ function IssueDetailDialog({
 
   return (
     <Dialog open={issue !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="h-[92vh] max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-5xl">
+      <DialogContent className="kanban-modal-scroll max-h-[92vh] gap-0 overflow-y-auto p-0 sm:max-w-6xl">
         {issue ? (
-          <div className="grid h-full grid-rows-[auto] overflow-y-auto md:grid-cols-[minmax(0,1fr)_26rem] md:grid-rows-1 md:overflow-hidden">
-            <div className="space-y-6 p-6 md:h-full md:overflow-y-auto">
+          <div>
+            <div className="space-y-6 p-6">
               <DialogHeader className="space-y-1">
                 <div className="flex items-center justify-between gap-2 pr-1">
                   <DialogDescription>In {issue.status}</DialogDescription>
@@ -824,17 +819,26 @@ function IssueDetailDialog({
                   </DropdownMenu>
                 </div>
                 <DialogTitle className="sr-only">{issue.title}</DialogTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <CompleteToggle
                     completed={Boolean(issue.completed)}
                     onToggle={() => onChange(issue.id, { completed: !issue.completed })}
                   />
                   <Input
                     aria-label="Card title"
-                    className="h-auto border-transparent bg-transparent px-1 text-2xl font-semibold shadow-none focus-visible:border-input"
+                    className="h-auto min-w-40 flex-1 border-transparent bg-transparent px-1 text-2xl font-semibold shadow-none focus-visible:border-input"
                     value={issue.title}
                     onChange={(event) => onChange(issue.id, { title: event.target.value })}
                   />
+                  {cardMembers.map((name) => (
+                    <Badge
+                      key={name}
+                      variant={name === "You" ? "secondary" : "outline"}
+                      className={name === "You" ? "shrink-0 bg-muted text-muted-foreground" : "shrink-0 border-primary/20 bg-primary/10 text-primary"}
+                    >
+                      {name}
+                    </Badge>
+                  ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex items-center gap-2">
@@ -888,10 +892,7 @@ function IssueDetailDialog({
                       </div>
                     ) : null}
                   </div>
-                </div>
-              </DialogHeader>
-
-              <div className="flex flex-wrap gap-2">
+                  <div className="ml-auto flex flex-wrap items-center gap-2">
                 {actionButtons.map(({ id, label, icon: Icon }) => (
                   <div key={id} className="relative">
                     <Button variant="outline" onClick={() => setPanel(panel === id ? null : id)}>
@@ -909,7 +910,7 @@ function IssueDetailDialog({
                       />
                     ) : null}
                     {id === "members" && panel === "members" ? (
-                      <div className="absolute top-full left-0 z-20 mt-2 w-72 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg">
+                      <div className="absolute top-full right-0 z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg">
                         <div className="relative mb-3 text-center text-sm font-semibold">
                           Members
                           <Button
@@ -965,15 +966,11 @@ function IssueDetailDialog({
                   <CheckSquare />
                   Checklist
                 </Button>
-              </div>
-
+                  </div>
+                </div>
+              </DialogHeader>
 
               <div className="flex flex-wrap gap-2">
-                {cardMembers.map((name) => (
-                  <Badge key={name} variant="outline">
-                    {name}
-                  </Badge>
-                ))}
                 {issue.archived ? <Badge variant="secondary">Archived</Badge> : null}
                 {issue.inactive ? <Badge variant="secondary">Inactive</Badge> : null}
                 {issue.startDate ? <Badge variant="outline">Start {formatDateTime(issue.startDate)}</Badge> : null}
@@ -1043,11 +1040,14 @@ function IssueDetailDialog({
                         {hidden ? `Show checked items (${done})` : "Hide checked items"}
                       </Button>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Delete checklist ${list.title}`}
+                        title="Delete checklist"
                         onClick={() => setChecklists(checklists.filter((item) => item.id !== list.id))}
                       >
-                        Delete
+                        <Trash2 />
                       </Button>
                     </div>
 
@@ -1141,7 +1141,7 @@ function IssueDetailDialog({
 
             </div>
 
-            <aside className="min-h-[28rem] space-y-4 border-t bg-muted/30 p-6 md:h-full md:overflow-y-auto md:border-t-0 md:border-l">
+            <aside className="space-y-4 border-t bg-muted/30 p-6">
               <div className="flex items-center justify-between gap-2 pr-8">
                 <h3 className="flex items-center gap-2 font-semibold whitespace-nowrap">
                   <MessageSquare className="size-5" />

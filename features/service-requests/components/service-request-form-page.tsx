@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { appToast } from "@/lib/app-toast";
 import type { Project } from "@/types";
 
@@ -17,6 +17,7 @@ type AttachmentDraft = { name: string; size: number; mimeType: string; id: strin
 const requestTypes = ["New Feature", "Enhancement", "Data/Report Request", "Lainnya"];
 
 function sizeLabel(size: number) { return size >= 1048576 ? `${(size / 1048576).toFixed(1)} MB` : size >= 1024 ? `${Math.round(size / 1024)} KB` : `${size} B`; }
+function plainText(value: string) { return value.replace(/<[^>]*>/g, " ").replace(/&nbsp;|&#160;/gi, " ").trim(); }
 function readBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -64,7 +65,7 @@ export function ServiceRequestFormPage() {
   }
 
   async function submit(status: "Draft" | "Submitted") {
-    if (status === "Submitted" && (!title.trim() || !description.trim() || !justification.trim() || !projectId)) {
+    if (status === "Submitted" && (!title.trim() || !plainText(description) || !plainText(justification) || !projectId)) {
       appToast.error({ title: "Complete required fields", description: "Title, description, business justification, and project are required to submit." });
       return;
     }
@@ -84,10 +85,10 @@ export function ServiceRequestFormPage() {
       <Card><CardHeader><CardDescription>Summarize what is needed and select its type.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-[2fr_1fr]">
         <div className="grid min-w-0 gap-2"><Label htmlFor="sr-title">Title *</Label><Input id="sr-title" maxLength={255} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What do you need?" /></div>
         <div className="grid min-w-0 gap-2"><Label>Type</Label><Select value={type} onValueChange={(v) => v && setType(v)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{requestTypes.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></div>
-        <div className="grid gap-2 md:col-span-3"><Label htmlFor="sr-description">Description *</Label><Textarea id="sr-description" rows={5} maxLength={10000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the requested change, data, or outcome." /></div>
+        <div className="grid gap-2 md:col-span-3"><Label>Description *</Label><RichTextEditor value={description} onChange={setDescription} placeholder="Describe the requested change, data, or outcome." /></div>
       </CardContent></Card>
       <Card><CardHeader><CardTitle>Business case & planning</CardTitle><CardDescription>Explain why it is needed and when you hope to receive it.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
-        <div className="grid gap-2"><Label htmlFor="sr-justification">Business justification *</Label><Textarea id="sr-justification" className="h-full min-h-28" maxLength={5000} value={justification} onChange={(e) => setJustification(e.target.value)} placeholder="Why is this needed? What benefit or impact will it have?" /></div>
+        <div className="grid gap-2"><Label>Business justification *</Label><RichTextEditor value={justification} onChange={setJustification} placeholder="Why is this needed? What benefit or impact will it have?" /></div>
         <div className="grid grid-rows-2 gap-4">
           <div className="grid content-start gap-2"><Label>Project *</Label><Select value={projectId} onValueChange={(v) => v && setProjectId(v)}><SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger><SelectContent>{projects.map((p) => <SelectItem key={p.NewId} value={p.NewId}>{p.Name}</SelectItem>)}</SelectContent></Select></div>
           <div className="grid content-start gap-2"><Label htmlFor="sr-target">Requested target date</Label><Input id="sr-target" type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} /></div>

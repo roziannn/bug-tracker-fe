@@ -3,6 +3,7 @@ import { fail, handleError, ok } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { getServiceRequest, SERVICE_REQUEST_STATUSES, updateServiceRequestDraft, updateServiceRequestStatus, SERVICE_REQUEST_PRIORITIES, SERVICE_REQUEST_TYPES } from "@/repositories/service-request.repository";
 import { parseDateOnly } from "@/lib/date";
+import { notifyServiceRequestPic } from "@/lib/services/service-request-notification.service";
 
 export const dynamic = "force-dynamic";
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -53,6 +54,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       if (result === "project-not-found") return fail("Project not found", 400);
       if (result === "pic-not-found") return fail("PIC not found", 400);
       if (result === "missing-fields") return fail("Complete the required fields before submitting", 400);
+      if (body.draftAction === "submit" && Number.isInteger(body.picId)) await notifyServiceRequestPic(id, body.picId, session.name);
       return ok({ updated: true });
     }
     if (!SERVICE_REQUEST_STATUSES.includes(body.status)) return fail("Invalid service request update", 400);
@@ -63,6 +65,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (result === "invalid-transition") return fail("This status transition is not allowed", 400);
     if (result === "missing-fields") return fail("Complete the required fields before submitting", 400);
     if (result === "pic-not-found") return fail("PIC not found", 400);
+    if (body.status === "In Progress" && Number.isInteger(body.picId)) await notifyServiceRequestPic(id, body.picId, session.name);
     return ok({ updated: true });
   } catch (error) { return handleError(error); }
 }

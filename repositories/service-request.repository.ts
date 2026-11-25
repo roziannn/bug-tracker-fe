@@ -4,6 +4,10 @@ export const SERVICE_REQUEST_STATUSES = ["Draft", "Submitted", "In Review", "App
 export const SERVICE_REQUEST_TYPES = ["New Feature", "Enhancement", "Data/Report Request", "Lainnya"] as const;
 export const SERVICE_REQUEST_PRIORITIES = ["Low", "Medium", "High", "Critical"] as const;
 
+function hasText(value: string) {
+  return value.replace(/<[^>]*>/g, " ").replace(/&nbsp;|&#160;/gi, " ").trim().length > 0;
+}
+
 export type ServiceRequestInput = {
   title: string;
   description: string;
@@ -33,7 +37,7 @@ export async function updateServiceRequestDraft(id: string, requesterId: number,
       const pic = await client.query(`SELECT 1 FROM "CORE_User" WHERE "Id" = $1 AND "IsActive" = true`, [input.picId]);
       if (!pic.rowCount) { await client.query("ROLLBACK"); return "pic-not-found" as const; }
     }
-    if (submit && (!input.title.trim() || !input.description.trim() || !input.businessJustification.trim() || !input.projectId)) {
+    if (submit && (!input.title.trim() || !hasText(input.description) || !hasText(input.businessJustification) || !input.projectId)) {
       await client.query("ROLLBACK"); return "missing-fields" as const;
     }
     const updated = await client.query(
@@ -178,7 +182,7 @@ export async function updateServiceRequestStatus(id: string, status: string, rev
       const pic = picId ? await client.query(`SELECT 1 FROM "CORE_User" WHERE "Id" = $1 AND "IsActive" = true`, [picId]) : null;
       if (!pic?.rowCount) { await client.query("ROLLBACK"); return "pic-not-found" as const; }
     }
-    if (status === "Submitted" && (!current.rows[0].Title.trim() || !current.rows[0].Description.trim() || !current.rows[0].BusinessJustification.trim() || !current.rows[0].ProjectId)) {
+    if (status === "Submitted" && (!current.rows[0].Title.trim() || !hasText(current.rows[0].Description) || !hasText(current.rows[0].BusinessJustification) || !current.rows[0].ProjectId)) {
       await client.query("ROLLBACK");
       return "missing-fields" as const;
     }
