@@ -2,13 +2,14 @@
 
   import Link from "next/link";
   import { useEffect, useMemo, useState } from "react";
-  import { ArrowDown, ArrowUp, Download, Equal, ListFilter, Plus, Search, ShieldAlert, TimerReset, TriangleAlert } from "lucide-react";
+  import { ArrowDown, ArrowUp, Download, Equal, ListFilter, Plus, ShieldAlert, TimerReset, TriangleAlert } from "lucide-react";
 
   import { AppShell } from "@/components/layout/app-shell";
   import { Badge } from "@/components/ui/badge";
   import { Button } from "@/components/ui/button";
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
   import { Input } from "@/components/ui/input";
+  import { SearchInput } from "@/components/shared/search-input";
   import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
   import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
   import { TablePagination } from "@/components/ui/table-pagination";
@@ -105,23 +106,20 @@
         </div>
 
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
-          <div className="flex w-full min-w-0 sm:min-w-56 items-center gap-2 rounded-xl border bg-card px-3 sm:w-auto">
-            <Search className="size-4 text-muted-foreground" />
-            <Input
+          <SearchInput
+            className="w-full rounded-xl sm:min-w-56 sm:w-auto"
               aria-label="Search issues"
-              className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
               placeholder="Search ticket id, title, or label..."
               value={searchQuery}
               onChange={(event) => onSearchChange(event.target.value)}
-            />
-          </div>
+          />
 
           <Select value={status} onValueChange={(value) => onStatusChange(value as StatusFilter)}>
-            <SelectTrigger className="h-9 w-auto min-w-[88px] px-2.5">
-              <SelectValue placeholder="all" />
+            <SelectTrigger className="h-9 w-auto min-w-[110px] px-2.5">
+              <SelectValue placeholder="All Status">{status === "all" ? "All Status" : undefined}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">all</SelectItem>
+              <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="Draft">Draft</SelectItem>
               <SelectItem value="Backlog">Backlog</SelectItem>
               <SelectItem value="Ready">Ready</SelectItem>
@@ -135,11 +133,11 @@
             value={priority}
             onValueChange={(value) => onPriorityChange(value as PriorityFilter)}
           >
-            <SelectTrigger className="h-9 w-auto min-w-[88px] px-2.5">
-              <SelectValue placeholder="all" />
+            <SelectTrigger className="h-9 w-auto min-w-[115px] px-2.5">
+              <SelectValue placeholder="All Priority">{priority === "all" ? "All Priority" : undefined}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">all</SelectItem>
+              <SelectItem value="all">All Priority</SelectItem>
               <SelectItem value="Critical">Critical</SelectItem>
               <SelectItem value="High">High</SelectItem>
               <SelectItem value="Medium">Medium</SelectItem>
@@ -148,11 +146,11 @@
           </Select>
 
           <Select value={label} onValueChange={(value) => onLabelChange(value as LabelFilter)}>
-            <SelectTrigger className="h-9 w-auto min-w-[88px] px-2.5">
-              <SelectValue placeholder="all" />
+            <SelectTrigger className="h-9 w-auto min-w-[105px] px-2.5">
+              <SelectValue placeholder="All Labels">{label === "all" ? "All Labels" : undefined}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">all</SelectItem>
+              <SelectItem value="all">All Labels</SelectItem>
               <SelectItem value="None">None</SelectItem>
               {labels.map((item) => (
                 <SelectItem key={item} value={item}>

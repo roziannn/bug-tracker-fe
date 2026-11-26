@@ -141,10 +141,20 @@ export function DatabaseMonitorPage() {
     <AppShell activeNav="settings" title="Database Monitor" eyebrow="Infrastructure" breadcrumbs={[{ label: "Database Monitor" }]}>
       <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Card><CardContent className="flex items-center gap-3 p-5"><Database className="size-5 text-muted-foreground" /><div><p className="text-sm text-muted-foreground">Registered databases</p><p className="text-2xl font-semibold">{filteredServers.length}</p></div></CardContent></Card>
-          <Card><CardContent className="flex items-center gap-3 p-5"><Activity className="size-5 text-muted-foreground" /><div><p className="text-sm text-muted-foreground">Online</p><p className="text-2xl font-semibold">{onlineCount}</p></div></CardContent></Card>
-          <Card><CardContent className="flex items-center gap-3 p-5"><HardDrive className="size-5 text-muted-foreground" /><div><p className="text-sm text-muted-foreground">Offline</p><p className="text-2xl font-semibold">{filteredServers.length - onlineCount}</p></div></CardContent></Card>
-          <Card><CardContent className="flex items-center gap-3 p-5"><Gauge className="size-5 text-muted-foreground" /><div><p className="text-sm text-muted-foreground">Average latency</p><p className="text-2xl font-semibold">{averageLatency}</p></div></CardContent></Card>
+          {[
+            { title: "Registered databases", subtitle: "Databases in this monitor", value: filteredServers.length, icon: Database },
+            { title: "Online", subtitle: "Currently reachable", value: onlineCount, icon: Activity },
+            { title: "Offline", subtitle: "Unavailable databases", value: filteredServers.length - onlineCount, icon: HardDrive },
+            { title: "Average latency", subtitle: "Across online databases", value: averageLatency, icon: Gauge },
+          ].map(({ title, subtitle, value, icon: Icon }) => <Card key={title} className="gap-4 py-5">
+            <CardContent className="space-y-3 px-5">
+              <div className="flex items-start justify-between gap-3">
+                <div><p className="font-semibold">{title}</p><p className="mt-1 text-sm text-muted-foreground">{subtitle}</p></div>
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="size-4" /></span>
+              </div>
+              <p className="text-4xl font-semibold tracking-tight">{value}<span className="ml-2 inline-flex translate-y-[-3px] rounded-full bg-muted px-2.5 py-1 align-middle text-xs font-medium text-muted-foreground">Live</span></p>
+            </CardContent>
+          </Card>)}
         </div>
 
         <div className="flex items-center justify-between gap-3">

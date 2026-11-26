@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Edit, Eye, Plus, Search } from "lucide-react";
+import { Download, Edit, Eye, Plus } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/shared/search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -167,9 +167,8 @@ const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
               <CardDescription>Every project with its owner, current status, go-live date, and timeline.</CardDescription>
             </div>
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
-              <div className="flex w-full min-w-0 items-center gap-2 rounded-xl border px-3 sm:w-auto sm:min-w-56">
-                <Search className="size-4 text-muted-foreground" />
-                <Input
+              <SearchInput
+                  className="w-full sm:w-auto sm:min-w-56"
                   aria-label="Search projects"
                   className="border-0 px-0 shadow-none focus-visible:ring-0"
                   onChange={(event) => {
@@ -179,7 +178,6 @@ const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
                   placeholder="Search project..."
                   value={searchQuery}
                 />
-              </div>
               <Select
                 onValueChange={(value) => {
                   setPriorityFilter(value ?? "all");
@@ -191,7 +189,9 @@ const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
                   className="h-9 w-auto min-w-[120px] px-2.5"
                   aria-label="Filter by priority"
                 >
-                  <SelectValue placeholder="Priority" />
+                  <SelectValue placeholder="Priority">
+                    {priorityFilter === "all" ? "All priorities" : priorityFilter}
+                  </SelectValue>
                 </SelectTrigger>
 
                 <SelectContent>

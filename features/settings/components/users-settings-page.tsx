@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/shared/search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -130,14 +131,14 @@ export function UsersSettingsPage() {
     >
       <Card>
         <CardContent className="space-y-4">
-          <Input
+          <SearchInput
+            className="max-w-sm"
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
               setPage(1);
             }}
             placeholder="Search name or email"
-            className="max-w-sm"
           />
 
           {loadError ? <p className="text-sm text-destructive">{loadError}</p> : null}

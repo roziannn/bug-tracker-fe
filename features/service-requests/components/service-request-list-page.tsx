@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Plus, Search } from "lucide-react";
+import { ClipboardList, Download, ListFilter, Plus, ShieldAlert, TimerReset, TriangleAlert } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/shared/search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -24,6 +24,21 @@ function statusStyle(status: string) {
   if (status === "In Review" || status === "In Progress") return "bg-blue-500/10 text-blue-700 dark:text-blue-400";
   if (status === "On Hold") return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
   return "bg-muted text-muted-foreground";
+}
+
+function exportRequestsToCsv(requests: RequestRow[]) {
+  const headers = ["Request Number", "Title", "Status", "Priority", "Project", "Requester", "PIC", "Target Date", "Created Date"];
+  const values = requests.map((row) => [row.number, row.title, row.status, row.priority, row.project, row.requester, row.pic, row.requestedTargetDate, row.createdAt]);
+  const csv = [headers, ...values]
+    .map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "service-requests.csv";
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export function ServiceRequestListPage() {
@@ -52,16 +67,39 @@ export function ServiceRequestListPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const closedStatuses = new Set(["done", "rejected", "cancelled"]);
+  const openRows = rows.filter((row) => row.status.toLowerCase() !== "draft" && !closedStatuses.has(row.status.toLowerCase()));
+  const inProgressCount = rows.filter((row) => ["in progress", "in review"].includes(row.status.toLowerCase())).length;
+  const criticalOpenCount = openRows.filter((row) => row.priority.toLowerCase() === "critical").length;
+  const completedCount = rows.filter((row) => row.status.toLowerCase() === "done").length;
+  const summaryCards = [
+    { title: "Total open", subtitle: "Submitted requests", value: openRows.length, icon: TimerReset },
+    { title: "In progress", subtitle: "In progress or in review", value: inProgressCount, icon: ListFilter },
+    { title: "Critical blockers", subtitle: "Open critical requests", value: criticalOpenCount, icon: TriangleAlert },
+    { title: "Closed", subtitle: "Completed requests", value: completedCount, icon: ShieldAlert },
+  ];
 
   return <AppShell activeNav="service-requests" breadcrumbs={[{ label: "Service Requests" }]} eyebrow="Request management" title="Service Requests" toolbar={<div className="flex items-center justify-between"><div><h2 className="text-lg font-semibold">Service Requests</h2><p className="text-sm text-muted-foreground">Track business requests from submission through delivery.</p></div><Button nativeButton={false} render={<Link href="/service-requests/new" />}><Plus />New request</Button></div>}>
+    <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {summaryCards.map(({ title, subtitle, value, icon: Icon }) => <Card key={title} className="gap-4 py-5">
+        <CardContent className="space-y-3 px-5">
+          <div className="flex items-start justify-between gap-3">
+            <div><p className="font-semibold">{title}</p><p className="mt-1 text-sm text-muted-foreground">{subtitle}</p></div>
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="size-4" /></span>
+          </div>
+          <p className="text-4xl font-semibold tracking-tight">{value}<span className="ml-2 inline-flex translate-y-[-3px] rounded-full bg-muted px-2.5 py-1 align-middle text-xs font-medium text-muted-foreground">Live</span></p>
+        </CardContent>
+      </Card>)}
+    </div>
     <Card>
       <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="shrink-0"><CardTitle>All Requests</CardTitle></div>
         <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2 lg:flex lg:flex-row lg:items-center lg:justify-end">
-          <div className="flex min-w-0 items-center gap-2 rounded-lg border px-3 sm:col-span-2 lg:w-[270px]"><Search className="size-4 shrink-0 text-muted-foreground" /><Input aria-label="Search requests" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search number, title, requester..." className="border-0 shadow-none focus-visible:ring-0" /></div>
-          <Select value={status} onValueChange={(v) => { setStatus(v ?? "all"); setPage(1); }}><SelectTrigger className="w-full lg:w-24"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{statuses.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
-          <Select value={priority} onValueChange={(v) => { setPriority(v ?? "all"); setPage(1); }}><SelectTrigger className="w-full lg:w-24"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{priorities.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
-          <Select value={projectId} onValueChange={(v) => { setProjectId(v ?? "all"); setPage(1); }}><SelectTrigger className="w-full lg:w-24"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{projects.map((project) => <SelectItem key={project.NewId} value={project.NewId}>{project.Name}</SelectItem>)}</SelectContent></Select>
+          <SearchInput className="w-full rounded-xl sm:col-span-2 sm:w-auto sm:min-w-56" aria-label="Search requests" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search number or title..." />
+          <Select value={status} onValueChange={(v) => { setStatus(v ?? "all"); setPage(1); }}><SelectTrigger className="w-full lg:w-32"><SelectValue placeholder="All Status">{status === "all" ? "All Status" : undefined}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All Status</SelectItem>{statuses.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
+          <Select value={priority} onValueChange={(v) => { setPriority(v ?? "all"); setPage(1); }}><SelectTrigger className="w-full lg:w-32"><SelectValue placeholder="All Priority">{priority === "all" ? "All Priority" : undefined}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All Priority</SelectItem>{priorities.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
+          <Select value={projectId} onValueChange={(v) => { setProjectId(v ?? "all"); setPage(1); }}><SelectTrigger className="w-full lg:w-32"><SelectValue placeholder="All Projects">{projectId === "all" ? "All Projects" : undefined}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">All Projects</SelectItem>{projects.map((project) => <SelectItem key={project.NewId} value={project.NewId}>{project.Name}</SelectItem>)}</SelectContent></Select>
+          <Button onClick={() => exportRequestsToCsv(filtered)} variant="secondary"><Download />Export</Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -8,6 +8,7 @@ import { moveCard } from "@/features/kanban/data/reorder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SearchInput } from "@/components/shared/search-input";
 import {
   Dialog,
   DialogContent,
@@ -123,14 +124,11 @@ function KanbanToolbar({
       </div>
 
       <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
-        <div className="flex w-full min-w-0 sm:min-w-72 items-center gap-2 rounded-xl border bg-card px-3 sm:w-auto">
-          <Search className="size-4 text-muted-foreground" />
-          <Input
+        <SearchInput
+            className="w-full rounded-xl sm:min-w-72 sm:w-auto"
             aria-label="Search board"
-            className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
             placeholder="Search cards, assignees, teams, or bug ids..."
           />
-        </div>
         <Button variant="outline" onClick={onOpenListGroup}>
           <ListFilter />
           List Group
@@ -923,7 +921,8 @@ function IssueDetailDialog({
                             <X />
                           </Button>
                         </div>
-                        <Input
+                        <SearchInput
+                          className="w-full"
                           autoFocus
                           aria-label="Search members"
                           value={memberQuery}

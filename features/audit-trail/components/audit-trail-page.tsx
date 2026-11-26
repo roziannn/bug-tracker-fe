@@ -1,23 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Search } from "lucide-react";
+import { Download } from "lucide-react";
 import { formatDateTime } from "@/lib/date";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchInput } from "@/components/shared/search-input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
-import type { AuditTrailAction, AuditTrailEntry, AuditTrailOutcome } from "@/features/bug-tracker/data/bug-tracker-data";
+import type { AuditTrailEntry, AuditTrailOutcome } from "@/features/bug-tracker/data/bug-tracker-data";
 
 const PAGE_SIZE = 8;
-
-type OutcomeFilter = AuditTrailOutcome | "all";
-type ActionFilter = AuditTrailAction | "all";
-type TeamFilter = string | "all";
 
 function formatTimestamp(dateString: string) {
   return formatDateTime(dateString);
@@ -48,30 +43,26 @@ function exportAuditTrailToCsv(rows: AuditTrailEntry[]) {
 export function AuditTrailPage({ initialEntries }: { initialEntries: AuditTrailEntry[] }) {
   const [auditTrailEntries] = useState<AuditTrailEntry[]>(initialEntries);
   const [searchQuery, setSearchQuery] = useState("");
-  const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
-  const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
-  const [teamFilter, setTeamFilter] = useState<TeamFilter>("all");
   const [page, setPage] = useState(1);
-  const actionOptions = Array.from(new Set(auditTrailEntries.map((entry) => entry.action)));
-  const teamOptions = Array.from(new Set(auditTrailEntries.map((entry) => entry.team).filter(Boolean)));
 
   const filteredEntries = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     return auditTrailEntries.filter((entry) => {
-      const matchesOutcome = outcomeFilter === "all" || entry.outcome === outcomeFilter;
-      const matchesAction = actionFilter === "all" || entry.action === actionFilter;
-      const matchesTeam = teamFilter === "all" || entry.team === teamFilter;
       const matchesSearch =
         !normalizedQuery ||
         String(entry.id).toLowerCase().includes(normalizedQuery) ||
         entry.actor.toLowerCase().includes(normalizedQuery) ||
+        entry.actorRole.toLowerCase().includes(normalizedQuery) ||
+        entry.action.toLowerCase().includes(normalizedQuery) ||
+        entry.team.toLowerCase().includes(normalizedQuery) ||
+        entry.outcome.toLowerCase().includes(normalizedQuery) ||
         entry.targetName.toLowerCase().includes(normalizedQuery) ||
         entry.detail.toLowerCase().includes(normalizedQuery);
 
-      return matchesOutcome && matchesAction && matchesTeam && matchesSearch;
+      return matchesSearch;
     });
-  }, [auditTrailEntries, actionFilter, outcomeFilter, searchQuery, teamFilter]);
+  }, [auditTrailEntries, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -90,11 +81,9 @@ export function AuditTrailPage({ initialEntries }: { initialEntries: AuditTrailE
           </div>
 
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
-            <div className="flex w-full min-w-0 items-center gap-2 rounded-xl border bg-card px-3 sm:min-w-64 sm:w-auto">
-              <Search className="size-4 text-muted-foreground" />
-              <Input
+            <SearchInput
+                className="w-full rounded-xl sm:min-w-64 sm:w-auto"
                 aria-label="Search audit trail"
-                className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                 placeholder="Search audit id, actor, target, or detail..."
                 value={searchQuery}
                 onChange={(event) => {
@@ -102,65 +91,6 @@ export function AuditTrailPage({ initialEntries }: { initialEntries: AuditTrailE
                   setPage(1);
                 }}
               />
-            </div>
-
-            <Select
-              value={outcomeFilter}
-              onValueChange={(value) => {
-                setOutcomeFilter(value as OutcomeFilter);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="h-9 w-auto min-w-25 px-2.5">
-                <SelectValue placeholder="Outcome" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">all</SelectItem>
-                <SelectItem value="Success">Success</SelectItem>
-                <SelectItem value="Warning">Warning</SelectItem>
-                <SelectItem value="Blocked">Blocked</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={actionFilter}
-              onValueChange={(value) => {
-                setActionFilter(value as ActionFilter);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="h-9 w-auto min-w-20 px-2.5">
-                <SelectValue placeholder="Action" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">all</SelectItem>
-                {actionOptions.map((action) => (
-                  <SelectItem key={action} value={action}>
-                    {action}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={teamFilter}
-              onValueChange={(value) => {
-                setTeamFilter(value as TeamFilter);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="h-9 w-auto min-w-20 px-2.5">
-                <SelectValue placeholder="Team" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">all</SelectItem>
-                {teamOptions.map((team) => (
-                  <SelectItem key={team} value={team}>
-                    {team}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
 
             <Button onClick={() => exportAuditTrailToCsv(filteredEntries)} variant="secondary">
               <Download />
@@ -205,7 +135,7 @@ export function AuditTrailPage({ initialEntries }: { initialEntries: AuditTrailE
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                      &quot;No audit events match the current filters.&quot;
+                      &quot;No audit events match your search.&quot;
                     </TableCell>
                   </TableRow>
                 )}

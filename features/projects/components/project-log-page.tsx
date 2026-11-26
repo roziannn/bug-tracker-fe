@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Search, Terminal } from "lucide-react";
+import { Copy, Terminal } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/shared/search-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { projectLogs, type ProjectLogEntry, type ProjectLogLevel } from "@/features/projects/data/project-log-data";
@@ -146,16 +146,13 @@ export function ProjectLogPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex w-full min-w-0 items-center gap-2 rounded-xl border bg-card px-3 sm:w-auto sm:min-w-64">
-              <Search className="size-4 text-muted-foreground" />
-              <Input
+            <SearchInput
+                className="w-full rounded-xl sm:w-auto sm:min-w-64"
                 aria-label="Search project logs"
-                className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
                 placeholder="Search id, project, service, or message..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
               />
-            </div>
 
             <Select value={projectFilter} onValueChange={(value) => setProjectFilter(value ?? "all")}>
               <SelectTrigger className="h-9 w-auto min-w-28 px-2.5">
