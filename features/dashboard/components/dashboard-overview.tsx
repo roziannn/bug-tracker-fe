@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CircleDot, GitBranch, ShieldAlert, Sparkles } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Label, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -12,13 +11,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TablePagination } from "@/components/ui/table-pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { priorityVariant, statusVariant } from "@/features/bug-tracker/data/bug-tracker-data";
-
-const iconMap = {
-  "circle-dot": CircleDot,
-  "shield-alert": ShieldAlert,
-  "git-branch": GitBranch,
-  sparkles: Sparkles,
-} as const;
 
 const teamChartConfig = {
   total: {
@@ -74,6 +66,21 @@ type ActualIssueSummary = {
   criticality: string;
   resolvedAt: string | null;
 };
+type ServiceRequestSummary = {
+  id: string;
+  number: string;
+  title: string;
+  type: string;
+  status: string;
+  priority: string;
+  requester: string | null;
+  project: string | null;
+  createdAt: string;
+};
+
+const serviceRequestChartConfig = {
+  requests: { label: "Requests", color: "var(--color-chart-1)" },
+} satisfies ChartConfig;
 
 function getPriorityLabel(priority: PriorityKey) {
   return priorityChartConfig[priority].label ?? priority;
@@ -85,6 +92,48 @@ export function DashboardOverview() {
   const [kanbanLoading, setKanbanLoading] = useState(true);
   const [actualIssues, setActualIssues] = useState<ActualIssueSummary[]>([]);
   const [issuesLoading, setIssuesLoading] = useState(true);
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
+  const [serviceRequestsLoading, setServiceRequestsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/service-requests", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Unable to load service requests"))))
+      .then((data: unknown) => {
+        if (active && Array.isArray(data)) {
+          setServiceRequests(data.filter((row): row is ServiceRequestSummary =>
+            typeof row?.id === "string" && typeof row?.number === "string" &&
+            typeof row?.title === "string" && typeof row?.type === "string" &&
+            typeof row?.status === "string" && typeof row?.priority === "string" &&
+            (typeof row?.requester === "string" || row?.requester === null) &&
+            (typeof row?.project === "string" || row?.project === null) &&
+            typeof row?.createdAt === "string",
+          ));
+        }
+      })
+      .catch(() => { if (active) setServiceRequests([]); })
+      .finally(() => { if (active) setServiceRequestsLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const requestsByStatus = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const request of serviceRequests) counts.set(request.status, (counts.get(request.status) ?? 0) + 1);
+    return [...counts].map(([status, requests]) => ({ status, requests }));
+  }, [serviceRequests]);
+  const requestsByPriority = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const request of serviceRequests) counts.set(request.priority, (counts.get(request.priority) ?? 0) + 1);
+    return [...counts].map(([priority, requests]) => ({ priority, requests }));
+  }, [serviceRequests]);
+  const requestsByType = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const request of serviceRequests) counts.set(request.type, (counts.get(request.type) ?? 0) + 1);
+    return [...counts].map(([type, requests]) => ({ type, requests }));
+  }, [serviceRequests]);
+  const recentRequests = useMemo(() => [...serviceRequests]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 8), [serviceRequests]);
 
   useEffect(() => {
     let active = true;
@@ -158,24 +207,6 @@ export function DashboardOverview() {
       const rightRank = right.criticality === "Tier 1 - Critical" ? 0 : 1;
       return leftRank - rightRank;
     }), [actualIssues]);
-  const resolvedThisWeek = useMemo(() => {
-    const startOfWeek = new Date();
-    startOfWeek.setHours(0, 0, 0, 0);
-    const daysSinceMonday = (startOfWeek.getDay() + 6) % 7;
-    startOfWeek.setDate(startOfWeek.getDate() - daysSinceMonday);
-    return actualIssues.filter((issue) => {
-      if (issue.status !== "Done" || !issue.resolvedAt) return false;
-      const resolvedAt = new Date(issue.resolvedAt);
-      return !Number.isNaN(resolvedAt.getTime()) && resolvedAt >= startOfWeek;
-    }).length;
-  }, [actualIssues]);
-  const actualOverviewCards = [
-    { label: "Open bugs", value: actualIssues.filter((issue) => issue.status !== "Draft" && issue.status !== "Done").length, change: "Live", note: "Issues not yet resolved", icon: "circle-dot" as const },
-    { label: "Critical issues", value: issuesByPriority.find((issue) => issue.priority === "Critical")?.count ?? 0, change: "Tier 1", note: "Criticality: Tier 1", icon: "shield-alert" as const },
-    { label: "In progress", value: actualIssues.filter((issue) => issue.status === "Investigating" || issue.status === "In review").length, change: "Live", note: "Investigating or in review", icon: "git-branch" as const },
-    { label: "Resolved this week", value: resolvedThisWeek, change: "This week", note: "Issues moved to Done", icon: "sparkles" as const },
-  ];
-
   const actualStatusChartConfig = useMemo(() => ({
     total: { label: "Issues", color: "var(--color-chart-1)" },
     ...Object.fromEntries(issuesByStatus.map(({ status, fill }) => [status, { label: status, color: fill }])),
@@ -222,56 +253,18 @@ export function DashboardOverview() {
       eyebrow="Sprint board"
       title="Product Quality Dashboard"
     >
-      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-        {actualOverviewCards.map((card) => {
-          const Icon = iconMap[card.icon];
-
-          return (
-            <Card key={card.label} className="h-full">
-              <CardHeader className="h-full">
-                <div className="flex h-full items-start justify-between gap-4">
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <CardDescription className="truncate font-semibold">
-                      {card.label}
-                    </CardDescription>
-
-                    <CardDescription className="mt-1 truncate">
-                      {card.note}
-                    </CardDescription>
-
-                    <div className="mt-3 flex items-center gap-3">
-                      <CardTitle className="text-4xl leading-none">
-                        {issuesLoading ? "—" : card.value}
-                      </CardTitle>
-
-                      <Badge variant="secondary" className="translate-y-0.5">
-                        {card.change}
-                      </Badge>
-                    </div>
-                  </div>
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <Icon className="size-4" />
-                  </span>
-                </div>
-              </CardHeader>
-            </Card>
-          );
-        })}
-      </div>
-
-      <Tabs className="mt-6 gap-4" defaultValue="active">
+      <Tabs className="gap-4" defaultValue="issues">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Issue flow</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Overview</h2>
           </div>
           <TabsList variant="line">
-            <TabsTrigger value="active">Active sprint</TabsTrigger>
-            <TabsTrigger value="triage">Triage queue</TabsTrigger>
-            <TabsTrigger value="resolved">Recently resolved</TabsTrigger>
+            <TabsTrigger value="issues">Issues</TabsTrigger>
+            <TabsTrigger value="service-requests">Service Requests</TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent value="active">
+        <TabsContent value="issues">
           <div className="grid gap-4 xl:grid-cols-3">
             <Card>
               <CardHeader>
@@ -453,35 +446,56 @@ export function DashboardOverview() {
           </div>
         </TabsContent>
 
-        <TabsContent value="triage">
-          <Card>
-            <CardHeader>
-              <CardTitle>Triage queue</CardTitle>
-              <CardDescription>Use this tab as the starting point for backlog review or a dedicated `/triage` page.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <Badge>7 unassigned</Badge>
-              <Badge variant="secondary">3 waiting for QA</Badge>
-              <Badge variant="outline">2 blocked by backend logs</Badge>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <TabsContent value="service-requests" className="space-y-4">
+          <div className="grid grid-cols-2 gap-6 border-b pb-5 sm:grid-cols-4">
+            {[
+              { label: "Total requests", value: serviceRequests.length },
+              { label: "Open requests", value: serviceRequests.filter((request) => !["Done", "Rejected", "Cancelled"].includes(request.status)).length },
+              { label: "In progress", value: serviceRequests.filter((request) => ["In Progress", "In Review"].includes(request.status)).length },
+              { label: "Completed", value: serviceRequests.filter((request) => request.status === "Done").length },
+            ].map((item) => (
+              <div key={item.label} className="space-y-2">
+                <p className="text-sm text-muted-foreground">{item.label}</p>
+                <p className="text-3xl font-semibold tracking-tight">{serviceRequestsLoading ? "—" : item.value}</p>
+              </div>
+            ))}
+          </div>
 
-        <TabsContent value="resolved">
+          <div className="grid gap-4 xl:grid-cols-3">
+            {[
+              { title: "Requests by status", data: requestsByStatus, key: "status" },
+              { title: "Requests by priority", data: requestsByPriority, key: "priority" },
+              { title: "Requests by type", data: requestsByType, key: "type" },
+            ].map((chart) => (
+              <Card key={chart.title}>
+                <CardHeader><CardTitle>{chart.title}</CardTitle></CardHeader>
+                <CardContent>
+                  {serviceRequestsLoading ? <div className="flex h-55 items-center justify-center text-sm text-muted-foreground">Loading service request data…</div> : !chart.data.length ? <div className="flex h-55 items-center justify-center text-sm text-muted-foreground">No service requests to display.</div> : (
+                    <ChartContainer className="h-55 w-full" config={serviceRequestChartConfig}>
+                      <BarChart accessibilityLayer data={chart.data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis dataKey={chart.key} tick={{ fill: "var(--foreground)", fillOpacity: 0.85 }} axisLine={false} tickLine={false} tickMargin={8} />
+                        <YAxis allowDecimals={false} tick={{ fill: "var(--foreground)", fillOpacity: 0.85 }} axisLine={false} tickLine={false} width={28} />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                        <Bar dataKey="requests" fill="var(--color-requests)" radius={8} />
+                      </BarChart>
+                    </ChartContainer>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
           <Card>
-            <CardHeader>
-              <CardTitle>Recently resolved</CardTitle>
-              <CardDescription>Shared UI is ready for velocity reports, release summaries, or changelog views.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="rounded-xl border p-4">
-                <p className="font-medium">BUG-196 fixed in `v2.8.0`</p>
-                <p className="text-sm text-muted-foreground">Session timeout banner now respects retry state and no longer overlaps the editor toolbar.</p>
-              </div>
-              <div className="rounded-xl border p-4">
-                <p className="font-medium">BUG-188 fixed in `v2.7.9`</p>
-                <p className="text-sm text-muted-foreground">Webhook delivery retries now show consistent timestamps across UTC and local user settings.</p>
-              </div>
+            <CardHeader><CardTitle>Recent service requests</CardTitle><CardDescription>Latest requests submitted to the team.</CardDescription></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader><TableRow><TableHead>Request</TableHead><TableHead>Type</TableHead><TableHead>Status</TableHead><TableHead>Priority</TableHead><TableHead>Requester</TableHead><TableHead>Project</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {!serviceRequestsLoading && !recentRequests.length ? <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No service requests to display.</TableCell></TableRow> : null}
+                  {recentRequests.map((request) => <TableRow key={request.id}><TableCell><p className="font-medium">{request.number}</p><p className="text-xs text-muted-foreground">{request.title}</p></TableCell><TableCell>{request.type}</TableCell><TableCell><Badge variant="outline">{request.status}</Badge></TableCell><TableCell>{request.priority}</TableCell><TableCell>{request.requester || "—"}</TableCell><TableCell>{request.project || "—"}</TableCell></TableRow>)}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
