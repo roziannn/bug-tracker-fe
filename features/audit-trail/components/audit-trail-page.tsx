@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TablePagination } from "@/components/ui/table-pagination";
 import type { AuditTrailEntry, AuditTrailOutcome } from "@/features/bug-tracker/data/bug-tracker-data";
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 function formatTimestamp(dateString: string) {
   return formatDateTime(dateString);

@@ -315,9 +315,6 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
         <Card>
           <CardHeader>
             <CardTitle>Project details</CardTitle>
-            <CardDescription>
-              {isEdit ? `Project ID: ${project.NewId}` : "Every new project gets a GUID-style ID when it is saved."}
-            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-6">
             <div className="grid gap-4 md:grid-cols-2">

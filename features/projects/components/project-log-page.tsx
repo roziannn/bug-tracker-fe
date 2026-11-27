@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Terminal } from "lucide-react";
+import { CircleX, Copy, ShieldAlert, Terminal, TriangleAlert } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -155,11 +155,11 @@ export function ProjectLogPage() {
               />
 
             <Select value={projectFilter} onValueChange={(value) => setProjectFilter(value ?? "all")}>
-              <SelectTrigger className="h-9 w-auto min-w-28 px-2.5">
-                <SelectValue placeholder="Project" />
+              <SelectTrigger className="h-9 w-auto min-w-36 px-2.5">
+                <SelectValue placeholder="Project">{projectFilter === "all" ? "All projects" : projectFilter}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">all projects</SelectItem>
+                <SelectItem value="all">All projects</SelectItem>
                 {projectNames.map((name) => (
                   <SelectItem key={name} value={name}>
                     {name}
@@ -169,11 +169,11 @@ export function ProjectLogPage() {
             </Select>
 
             <Select value={levelFilter} onValueChange={(value) => setLevelFilter((value ?? "all") as LevelFilter)}>
-              <SelectTrigger className="h-9 w-auto min-w-24 px-2.5">
-                <SelectValue placeholder="Level" />
+              <SelectTrigger className="h-9 w-auto min-w-32 px-2.5">
+                <SelectValue placeholder="Level">{levelFilter === "all" ? "All levels" : levelFilter}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">all levels</SelectItem>
+                <SelectItem value="all">All levels</SelectItem>
                 <SelectItem value="FATAL">FATAL</SelectItem>
                 <SelectItem value="ERROR">ERROR</SelectItem>
                 <SelectItem value="WARN">WARN</SelectItem>
@@ -186,13 +186,21 @@ export function ProjectLogPage() {
       <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-3">
           {(["FATAL", "ERROR", "WARN"] as const).map((level) => (
-            <Card key={level} size="sm">
-              <CardContent className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{level === "WARN" ? "Warnings" : `${level[0]}${level.slice(1).toLowerCase()} logs`}</p>
-                  <p className="text-2xl font-semibold tabular-nums">{count(level)}</p>
+            <Card key={level} className="gap-4 py-5">
+              <CardContent className="space-y-3 px-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{level === "WARN" ? "Warnings" : `${level[0]}${level.slice(1).toLowerCase()} logs`}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{level === "FATAL" ? "Critical system failures" : level === "ERROR" ? "Application errors" : "Potential issues"}</p>
+                  </div>
+                  <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl", level === "WARN" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-red-500/10 text-red-600 dark:text-red-400")}>
+                    {level === "FATAL" ? <ShieldAlert className="size-4" /> : level === "ERROR" ? <CircleX className="size-4" /> : <TriangleAlert className="size-4" />}
+                  </span>
                 </div>
-                <LevelBadge level={level} />
+                <p className="text-4xl font-semibold tracking-tight tabular-nums">
+                  {count(level)}
+                  <span className="ml-2 inline-flex translate-y-[-3px] align-middle"><LevelBadge level={level} /></span>
+                </p>
               </CardContent>
             </Card>
           ))}

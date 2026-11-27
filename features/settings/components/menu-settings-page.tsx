@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Pencil, Plus, Trash2, X } from "lucide-react";
+import { GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,8 @@ export function MenuSettingsPage() {
   const [buttonName, setButtonName] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<MenuNode | null>(null);
   const rows = orderMenus(menus);
   // Parent bisa menu mana pun, kecuali menu itu sendiri dan turunannya (supaya tidak melingkar).
@@ -106,8 +108,22 @@ export function MenuSettingsPage() {
     }
   }
 
-  function move(id: string, direction: -1 | 1) {
-    return runAction(id, () => request("/api/menus/reorder", "POST", { code: id, direction }), "Failed to reorder menu");
+  function reorderTo(id: string, targetId: string) {
+    const dragged = menus.find((menu) => menu.id === id);
+    const target = menus.find((menu) => menu.id === targetId);
+    if (!dragged || !target || dragged.parentId !== target.parentId || id === targetId) return;
+
+    const siblings = rows.filter(({ menu }) => menu.parentId === dragged.parentId).map(({ menu }) => menu.id);
+    const from = siblings.indexOf(id);
+    const to = siblings.indexOf(targetId);
+    if (from < 0 || to < 0 || from === to) return;
+
+    const direction = to > from ? 1 : -1;
+    return runAction(id, async () => {
+      for (let step = 0; step < Math.abs(to - from); step++) {
+        await request("/api/menus/reorder", "POST", { code: id, direction });
+      }
+    }, "Failed to reorder menu");
   }
 
   function toggleVisible(menu: MenuNode) {
@@ -241,10 +257,10 @@ export function MenuSettingsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Order</TableHead>
                 <TableHead>Menu</TableHead>
                 <TableHead>Path</TableHead>
                 <TableHead>Buttons</TableHead>
-                <TableHead>Order</TableHead>
                 <TableHead>Visible</TableHead>
                 <TableHead>Created by</TableHead>
                 <TableHead>Created date</TableHead>
@@ -255,12 +271,55 @@ export function MenuSettingsPage() {
               {!loaded ? <TableSkeletonRows rows={7} columns={COLUMNS} /> : null}
               {rows.map(({ menu, depth }) => {
                 const Icon = getMenuIcon(menu.icon);
-                const siblings = menus.filter((item) => item.parentId === menu.parentId);
-                const position = siblings.indexOf(menu);
+                const siblings = rows.filter((item) => item.menu.parentId === menu.parentId);
+                const position = siblings.findIndex((item) => item.menu.id === menu.id);
                 const busy = busyId === menu.id;
 
                 return (
-                  <TableRow key={menu.id} className={cn(!menu.visible && "opacity-60")}>
+                  <TableRow
+                    key={menu.id}
+                    onDragOver={(event) => {
+                      const dragged = menus.find((item) => item.id === dragId);
+                      if (!dragged || dragged.parentId !== menu.parentId || dragId === menu.id) return;
+                      event.preventDefault();
+                      setDropTargetId(menu.id);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const sourceId = event.dataTransfer.getData("text/plain") || dragId;
+                      if (sourceId) void reorderTo(sourceId, menu.id);
+                      setDragId(null);
+                      setDropTargetId(null);
+                    }}
+                    onDragLeave={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTargetId(null);
+                    }}
+                    className={cn(!menu.visible && "opacity-60", dropTargetId === menu.id && "border-t-2 border-primary", dragId === menu.id && "opacity-40")}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          draggable={!busy}
+                          disabled={busy}
+                          aria-label={`Drag to reorder ${menu.label}`}
+                          title="Drag to reorder"
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData("text/plain", menu.id);
+                            setDragId(menu.id);
+                          }}
+                          onDragEnd={() => {
+                            setDragId(null);
+                            setDropTargetId(null);
+                          }}
+                          className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:cursor-not-allowed"
+                        >
+                          <GripVertical className="size-4" />
+                        </button>
+                        <span className="tabular-nums text-muted-foreground">{position + 1}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="relative">
                       {treeGuides(menus, menu).map((isLast, index) => {
                         const own = index === depth - 1;
@@ -294,28 +353,6 @@ export function MenuSettingsPage() {
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">{menu.path || "-"}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{menu.actions.length}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Move up"
-                          disabled={busy || position === 0}
-                          onClick={() => move(menu.id, -1)}
-                        >
-                          <ArrowUp />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Move down"
-                          disabled={busy || position === siblings.length - 1}
-                          onClick={() => move(menu.id, 1)}
-                        >
-                          <ArrowDown />
-                        </Button>
-                      </div>
-                    </TableCell>
                     <TableCell>
                       <button
                         type="button"

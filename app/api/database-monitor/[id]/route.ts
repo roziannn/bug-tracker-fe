@@ -12,9 +12,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     const session = await getSession();
     if (!session) return fail("Unauthorized", 401);
     const access = await query<{ allowed: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1 FROM "CORE_RoleMenu" rm JOIN "CORE_Menu" m ON m."Id" = rm."MenuId"
-         WHERE rm."RoleId" = $1 AND m."Path" = '/database-monitor' AND m."ParentId" IS NULL AND m."IsVisible" = true
+      `SELECT (
+         EXISTS (SELECT 1 FROM "CORE_Role" r WHERE r."Id" = $1 AND lower(r."Name") IN ('admin', 'administrator'))
+         OR EXISTS (
+           SELECT 1 FROM "CORE_RoleMenu" rm JOIN "CORE_Menu" m ON m."Id" = rm."MenuId"
+           WHERE rm."RoleId" = $1 AND m."Path" = '/database-monitor' AND m."IsVisible" = true
+         )
        ) AS allowed`,
       [session.roleId],
     );
@@ -37,9 +40,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const session = await getSession();
     if (!session) return fail("Unauthorized", 401);
     const access = await query<{ allowed: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1 FROM "CORE_RoleMenu" rm JOIN "CORE_Menu" m ON m."Id" = rm."MenuId"
-         WHERE rm."RoleId" = $1 AND m."Path" = '/database-monitor' AND m."ParentId" IS NULL AND m."IsVisible" = true
+      `SELECT (
+         EXISTS (SELECT 1 FROM "CORE_Role" r WHERE r."Id" = $1 AND lower(r."Name") IN ('admin', 'administrator'))
+         OR EXISTS (
+           SELECT 1 FROM "CORE_RoleMenu" rm JOIN "CORE_Menu" m ON m."Id" = rm."MenuId"
+           WHERE rm."RoleId" = $1 AND m."Path" = '/database-monitor' AND m."IsVisible" = true
+         )
        ) AS allowed`,
       [session.roleId],
     );
