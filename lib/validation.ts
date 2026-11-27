@@ -129,6 +129,7 @@ export const createProjectSchema = z
     techStack: z.array(z.object({
       category: z.enum(["Database", "Frontend", "Backend"]),
       technology: z.string().trim().min(1, "Technology is required").max(100, "Technology must be at most 100 characters"),
+      version: z.string().trim().min(1, "Version is required").max(50, "Version must be at most 50 characters"),
     })).max(30, "Too many technologies").default([]),
     environments: z.record(z.string(), z.string()).default({}),
     phases: z
@@ -138,9 +139,17 @@ export const createProjectSchema = z
             name: z.string().trim().min(1, "Phase name is required").max(100, "Phase name must be at most 100 characters"),
             start: dateOnly,
             end: dateOnly,
+            actualStart: z.string().default("").refine((value) => value === "" || parseDateOnly(value) !== null, "Actual start date is invalid"),
+            actualEnd: z.string().default("").refine((value) => value === "" || parseDateOnly(value) !== null, "Actual end date is invalid"),
           })
           .refine((phase) => parseDateOnly(phase.end)! >= parseDateOnly(phase.start)!, {
             message: "A phase end date must be on or after its start date",
+          })
+          .refine((phase) => (phase.actualStart === "") === (phase.actualEnd === ""), {
+            message: "Enter both actual start and end dates, or leave both empty",
+          })
+          .refine((phase) => !phase.actualStart || parseDateOnly(phase.actualEnd)! >= parseDateOnly(phase.actualStart)!, {
+            message: "An actual end date must be on or after its start date",
           })
       )
       .max(50, "Too many phases")

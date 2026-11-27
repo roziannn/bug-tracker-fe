@@ -17,7 +17,7 @@ import { DEFAULT_PRIORITY, PROJECT_PRIORITIES, type ProjectPriority } from "@/fe
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { appToast } from "@/lib/app-toast";
-import { DAY_MS, parseDateOnly, toDateOnly } from "@/lib/date";
+import { DAY_MS, formatDate, parseDateOnly, toDateOnly } from "@/lib/date";
 import type { Category, Paged, ProjectDetail, User } from "@/types";
 
 async function getJson<T>(url: string): Promise<T> {
@@ -39,6 +39,24 @@ const DATE_MIN = "2000-01-01";
 const DATE_MAX = "2100-12-31";
 const TECH_STACK_CATEGORIES = ["Database", "Frontend", "Backend"] as const;
 type TechStackCategory = (typeof TECH_STACK_CATEGORIES)[number];
+
+function formatDateRange(start: string, end: string) {
+  if (!start || !end) return `${start ? formatDate(start) : "Start date"} – ${end ? formatDate(end) : "End date"}`;
+  const startParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start);
+  const endParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(end);
+  if (!startParts || !endParts) return `${formatDate(start)} – ${formatDate(end)}`;
+
+  const [, startYear, startMonth, startDay] = startParts;
+  const [, endYear, endMonth, endDay] = endParts;
+  if (startYear === endYear && startMonth === endMonth) {
+    const monthName = formatDate(start).split(" ")[1];
+    return `${Number(startDay)}–${Number(endDay)} ${monthName} ${startYear}`;
+  }
+  if (startYear === endYear) {
+    return `${formatDate(start).replace(` ${startYear}`, "")} – ${formatDate(end)}`;
+  }
+  return `${formatDate(start)} – ${formatDate(end)}`;
+}
 
 // Salah satu isian phase yang kurang (hanya dicek setelah tombol Create ditekan).
 function missingField(phase: TimelinePhase): string | null {
@@ -68,7 +86,7 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
   );
   const [techStack, setTechStack] = useState(() =>
     project?.TechStack?.length
-      ? project.TechStack.map((item, index) => ({ id: `stack-${index}`, category: item.category as TechStackCategory, technology: item.technology }))
+      ? project.TechStack.map((item, index) => ({ id: `stack-${index}`, category: item.category as TechStackCategory, technology: item.technology, version: item.version ?? "" }))
       : []
   );
   const [goLiveDate, setGoLiveDate] = useState(project?.GoLiveDate ?? "");
@@ -89,6 +107,8 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
       name: phase.Name,
       start: phase.StartDate,
       end: phase.EndDate,
+      actualStart: phase.ActualStartDate ?? "",
+      actualEnd: phase.ActualEndDate ?? "",
     }))
   );
   const nextPhaseId = useRef(project?.Phases.length ?? 0);
@@ -155,6 +175,10 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
 
   const validPhases = useMemo(() => phases.filter((phase) => !missingField(phase) && !orderError(phase)), [phases]);
   const phasesInvalid = phases.some((phase) => missingField(phase) || orderError(phase));
+  const actualDatesInvalid = phases.some((phase) =>
+    (Boolean(phase.actualStart) !== Boolean(phase.actualEnd)) ||
+    (phase.actualStart && phase.actualEnd && parseDateOnly(phase.actualEnd)! < parseDateOnly(phase.actualStart)!)
+  );
 
   // Repository yang sama dua kali: yang kedua ditandai.
   const repositoryKeys = repositories.map((item) => item.value.trim().toLowerCase());
@@ -179,10 +203,10 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
   }
 
   function addTechStack() {
-    setTechStack((current) => [...current, { id: `stack-${nextTechStackId.current++}`, category: "Database", technology: "" }]);
+    setTechStack((current) => [...current, { id: `stack-${nextTechStackId.current++}`, category: "Database", technology: "", version: "" }]);
   }
 
-  function updateTechStack(id: string, patch: Partial<{ category: TechStackCategory; technology: string }>) {
+  function updateTechStack(id: string, patch: Partial<{ category: TechStackCategory; technology: string; version: string }>) {
     setTechStack((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
   }
 
@@ -194,7 +218,7 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
     // Phase baru dimulai sehari setelah phase sebelumnya selesai.
     const lastEnd = phases.length ? parseDateOnly(phases[phases.length - 1].end) : null;
     const start = lastEnd === null ? "" : toDateOnly(lastEnd + DAY_MS);
-    setPhases((current) => [...current, { id: `phase-${nextPhaseId.current++}`, name: "", start, end: "" }]);
+    setPhases((current) => [...current, { id: `phase-${nextPhaseId.current++}`, name: "", start, end: "", actualStart: "", actualEnd: "" }]);
   }
 
   function updatePhase(id: string, patch: Partial<TimelinePhase>) {
@@ -213,8 +237,13 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
     event.preventDefault();
     setSubmitted(true);
 
-    if (!name.trim() || !ownerId || hasUrlError || phasesInvalid || hasRepositoryError || nameTaken) {
+    if (!name.trim() || !ownerId || hasUrlError || phasesInvalid || actualDatesInvalid || hasRepositoryError || nameTaken) {
       appToast.error({ title: "Check the form", description: "Fill in the required fields and fix the highlighted fields." });
+      return;
+    }
+
+    if (techStack.some((item) => !item.technology.trim() || !item.version.trim())) {
+      appToast.error({ title: "Check the form", description: "Enter both the technology and version for every stack." });
       return;
     }
 
@@ -231,13 +260,13 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
           goLiveDate,
           tags: (tagOptions ?? []).filter((tag) => tags.includes(tag.Name)).map((tag) => tag.Id),
           repositories: repositories.map((item) => item.value.trim()).filter(Boolean),
-          techStack: techStack.filter((item) => item.technology.trim()).map(({ category, technology }) => ({ category, technology: technology.trim() })),
+          techStack: techStack.map(({ category, technology, version }) => ({ category, technology: technology.trim(), version: version.trim() })),
           environments: Object.fromEntries(
             Object.entries(urls)
               .map(([environment, url]) => [environment, url.trim()])
               .filter(([, url]) => url !== "")
           ),
-          phases: validPhases.map((phase) => ({ name: phase.name.trim(), start: phase.start, end: phase.end })),
+          phases: validPhases.map((phase) => ({ name: phase.name.trim(), start: phase.start, end: phase.end, actualStart: phase.actualStart, actualEnd: phase.actualEnd })),
         }),
       });
       const data = await res.json().catch(() => null);
@@ -400,17 +429,15 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
         <Card>
           <CardHeader>
             <CardTitle>Timeline</CardTitle>
-            <CardDescription>
-              Plan the project phases. The Gantt chart below updates as you fill in the dates.
-            </CardDescription>
+            <CardDescription>Enter planned dates for each phase, then add actual dates to compare delivery against the plan.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-6">
             <div className="grid gap-3">
               {phases.length ? (
-                <div className="hidden gap-2 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[1fr_10rem_10rem_2rem]">
+                <div className="hidden gap-2 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[minmax(0,16rem)_minmax(0,12rem)_minmax(0,12rem)_2rem]">
                   <span>Phase</span>
-                  <span>Start date</span>
-                  <span>End date</span>
+                  <span>Plan dates</span>
+                  <span>Actual dates</span>
                   <span />
                 </div>
               ) : null}
@@ -420,7 +447,7 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
 
                 return (
                   <div key={phase.id} className="grid gap-1 rounded-lg border p-3 md:border-0 md:p-0">
-                    <div className="grid gap-2 md:grid-cols-[1fr_10rem_10rem_2rem] md:items-center">
+                    <div className="grid min-w-0 gap-2 md:grid-cols-[minmax(0,16rem)_minmax(0,12rem)_minmax(0,12rem)_2rem] md:items-center">
                       <Input
                         aria-label={`Phase ${index + 1} name`}
                         placeholder="Example: Development"
@@ -429,31 +456,49 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
                         aria-invalid={(error && !phase.name.trim()) || undefined}
                         onChange={(event) => updatePhase(phase.id, { name: event.target.value })}
                       />
-                      <div className="grid gap-1">
-                        <span className="text-xs text-muted-foreground md:hidden">Start date</span>
-                        <Input
-                          type="date"
-                          aria-label={`Phase ${index + 1} start date`}
-                          className="[color-scheme:light] dark:[color-scheme:dark]"
-                          min={DATE_MIN}
-                          max={DATE_MAX}
-                          value={phase.start}
-                          aria-invalid={(error && parseDateOnly(phase.start) === null) || undefined}
-                          onChange={(event) => updatePhase(phase.id, { start: event.target.value })}
-                        />
+                      <div className="grid min-w-0 gap-1">
+                        <span className="text-xs text-muted-foreground md:hidden">Plan dates</span>
+                        <details className="group relative min-w-0">
+                          <summary
+                            aria-label={`Choose planned date range for phase ${index + 1}`}
+                            aria-invalid={(error && (parseDateOnly(phase.start) === null || parseDateOnly(phase.end) === null || orderError(phase) !== null)) || undefined}
+                            className="flex h-9 min-w-0 w-full cursor-pointer list-none items-center overflow-hidden rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none marker:hidden focus-visible:ring-3 focus-visible:ring-ring/50 aria-[invalid=true]:border-destructive [&::-webkit-details-marker]:hidden"
+                          >
+                            <span className="truncate">{formatDateRange(phase.start, phase.end)}</span>
+                          </summary>
+                          <div className="absolute top-full left-0 z-30 mt-1 grid w-72 gap-3 rounded-md border bg-popover p-3 text-popover-foreground shadow-lg">
+                            <label className="grid gap-1 text-xs text-muted-foreground">
+                              Plan start
+                              <Input type="date" aria-label={`Phase ${index + 1} planned start date`} className="[color-scheme:light] dark:[color-scheme:dark]" min={DATE_MIN} max={DATE_MAX} value={phase.start} aria-invalid={(error && parseDateOnly(phase.start) === null) || undefined} onChange={(event) => updatePhase(phase.id, { start: event.target.value })} />
+                            </label>
+                            <label className="grid gap-1 text-xs text-muted-foreground">
+                              Plan end
+                              <Input type="date" aria-label={`Phase ${index + 1} planned end date`} className="[color-scheme:light] dark:[color-scheme:dark]" min={phase.start || DATE_MIN} max={DATE_MAX} value={phase.end} aria-invalid={(error && (parseDateOnly(phase.end) === null || orderError(phase) !== null)) || undefined} onChange={(event) => updatePhase(phase.id, { end: event.target.value })} />
+                            </label>
+                          </div>
+                        </details>
                       </div>
-                      <div className="grid gap-1">
-                        <span className="text-xs text-muted-foreground md:hidden">End date</span>
-                        <Input
-                          type="date"
-                          aria-label={`Phase ${index + 1} end date`}
-                          className="[color-scheme:light] dark:[color-scheme:dark]"
-                          min={phase.start || DATE_MIN}
-                          max={DATE_MAX}
-                          value={phase.end}
-                          aria-invalid={(error && (parseDateOnly(phase.end) === null || orderError(phase) !== null)) || undefined}
-                          onChange={(event) => updatePhase(phase.id, { end: event.target.value })}
-                        />
+                      <div className="grid min-w-0 gap-1">
+                        <span className="text-xs text-muted-foreground md:hidden">Actual dates</span>
+                        <details className="group relative min-w-0">
+                          <summary
+                            aria-label={`Choose actual date range for phase ${index + 1}`}
+                            aria-invalid={submitted && (Boolean(phase.actualStart) !== Boolean(phase.actualEnd) || Boolean(phase.actualStart && phase.actualEnd && parseDateOnly(phase.actualEnd)! < parseDateOnly(phase.actualStart)!)) || undefined}
+                            className="flex h-9 min-w-0 w-full cursor-pointer list-none items-center overflow-hidden rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none marker:hidden focus-visible:ring-3 focus-visible:ring-ring/50 aria-[invalid=true]:border-destructive [&::-webkit-details-marker]:hidden"
+                          >
+                            <span className="truncate">{formatDateRange(phase.actualStart, phase.actualEnd)}</span>
+                          </summary>
+                          <div className="absolute top-full right-0 left-auto z-30 mt-1 grid w-72 gap-3 rounded-md border bg-popover p-3 text-popover-foreground shadow-lg">
+                            <label className="grid gap-1 text-xs text-muted-foreground">
+                              Actual start
+                              <Input type="date" aria-label={`Phase ${index + 1} actual start date`} className="[color-scheme:light] dark:[color-scheme:dark]" min={DATE_MIN} max={DATE_MAX} value={phase.actualStart} aria-invalid={submitted && (Boolean(phase.actualStart) !== Boolean(phase.actualEnd)) || undefined} onChange={(event) => updatePhase(phase.id, { actualStart: event.target.value })} />
+                            </label>
+                            <label className="grid gap-1 text-xs text-muted-foreground">
+                              Actual end
+                              <Input type="date" aria-label={`Phase ${index + 1} actual end date`} className="[color-scheme:light] dark:[color-scheme:dark]" min={phase.actualStart || DATE_MIN} max={DATE_MAX} value={phase.actualEnd} aria-invalid={submitted && (Boolean(phase.actualStart) !== Boolean(phase.actualEnd) || Boolean(phase.actualStart && phase.actualEnd && parseDateOnly(phase.actualEnd)! < parseDateOnly(phase.actualStart)!)) || undefined} onChange={(event) => updatePhase(phase.id, { actualEnd: event.target.value })} />
+                            </label>
+                          </div>
+                        </details>
                       </div>
                       <Button
                         type="button"
@@ -466,6 +511,7 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
                       </Button>
                     </div>
                     {error ? <p className="text-xs text-destructive">{error}</p> : null}
+                    {submitted && actualDatesInvalid ? <p className="text-xs text-destructive">Enter both actual dates and make sure the end is on or after the start.</p> : null}
                   </div>
                 );
               })}
@@ -534,7 +580,7 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
           </CardHeader>
           <CardContent className="grid gap-3">
             {techStack.map((item, index) => (
-              <div key={item.id} className="grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
+              <div key={item.id} className="grid gap-2 sm:grid-cols-[10rem_10rem_10rem_2rem]">
                 <select
                   aria-label={`Tech stack category ${index + 1}`}
                   className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -550,6 +596,14 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
                   maxLength={100}
                   onChange={(event) => updateTechStack(item.id, { technology: event.target.value })}
                 />
+                <Input
+                  aria-label={`${item.category} version ${index + 1}`}
+                  placeholder="Version (required)"
+                  value={item.version}
+                  maxLength={50}
+                  aria-invalid={submitted && !item.version.trim() || undefined}
+                  onChange={(event) => updateTechStack(item.id, { version: event.target.value })}
+                />
                 <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${item.category} technology ${index + 1}`} onClick={() => removeTechStack(item.id)}>
                   <Trash2 />
                 </Button>
@@ -557,7 +611,7 @@ function ProjectForm({ project }: { project?: ProjectDetail }) {
             ))}
             <div>
               <Button type="button" variant="outline" onClick={addTechStack}>
-                <Plus /> Add technology
+                <Plus /> Add stack
               </Button>
             </div>
           </CardContent>

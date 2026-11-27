@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PriorityBadge } from "@/features/projects/components/priority-badge";
 import { ProjectGantt, type TimelinePhase } from "@/features/projects/components/project-gantt";
 import { appToast } from "@/lib/app-toast";
-import { formatDate } from "@/lib/date";
+import { DAY_MS, formatDate, parseDateOnly } from "@/lib/date";
 import { requestJson } from "@/lib/request";
 import type { ProjectDetail } from "@/types";
 
@@ -58,6 +58,8 @@ export function ProjectDetailPage({ id }: { id: string }) {
         name: phase.Name,
         start: phase.StartDate,
         end: phase.EndDate,
+        actualStart: phase.ActualStartDate ?? "",
+        actualEnd: phase.ActualEndDate ?? "",
       })),
     [project]
   );
@@ -243,6 +245,29 @@ export function ProjectDetailPage({ id }: { id: string }) {
               savingPhaseId={savingPhaseId}
               emptyMessage="This project has no timeline phases."
             />
+            {project.Phases.length ? (
+              <div className="mt-4 grid gap-2">
+                {project.Phases.map((phase) => {
+                  const duration = (start: string | null, end: string | null) => {
+                    if (!start || !end) return null;
+                    const startDate = parseDateOnly(start);
+                    const endDate = parseDateOnly(end);
+                    return startDate === null || endDate === null || endDate < startDate ? null : (endDate - startDate) / DAY_MS + 1;
+                  };
+                  const planDays = duration(phase.StartDate, phase.EndDate);
+                  const actualDays = duration(phase.ActualStartDate, phase.ActualEndDate);
+
+                  return (
+                    <div key={phase.Id} className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-md border px-3 py-2 text-sm">
+                      <span className="min-w-28 font-medium">{phase.Name}</span>
+                      <span className="text-muted-foreground">Plan: {planDays} {planDays === 1 ? "day" : "days"} ({formatDate(phase.StartDate)} – {formatDate(phase.EndDate)})</span>
+                      <span className="text-muted-foreground">Actual: {actualDays === null ? "Not entered" : `${actualDays} ${actualDays === 1 ? "day" : "days"} (${formatDate(phase.ActualStartDate!)} – ${formatDate(phase.ActualEndDate!)})`}</span>
+                      {actualDays !== null && planDays !== null ? <span className={actualDays > planDays ? "text-destructive" : "text-emerald-600"}>{actualDays === planDays ? "On plan" : `${Math.abs(actualDays - planDays)} days ${actualDays > planDays ? "over" : "under"} plan`}</span> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -308,6 +333,7 @@ export function ProjectDetailPage({ id }: { id: string }) {
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-muted-foreground">{item.category}</p>
                       <p className="break-words text-sm font-medium">{item.technology}</p>
+                      <p className="text-xs text-muted-foreground">Version {item.version}</p>
                     </div>
                   </div>
                 ))}

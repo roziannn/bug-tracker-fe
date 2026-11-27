@@ -104,6 +104,8 @@ export interface ProjectPhase {
   Name: string;
   StartDate: string;
   EndDate: string;
+  ActualStartDate: string | null;
+  ActualEndDate: string | null;
   Sequence: number;
 }
 
@@ -120,7 +122,7 @@ export interface ProjectDetail extends AuditFields {
   Tags: { Id: number; Name: string }[];
   Phases: ProjectPhase[];
   Repositories: string[];
-  TechStack: { category: string; technology: string }[];
+  TechStack: { category: string; technology: string; version: string }[];
   Environments: { Environment: string; Url: string }[];
 }
 

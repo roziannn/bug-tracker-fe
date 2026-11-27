@@ -46,6 +46,8 @@ export const dataProjectPhases = pgTable("DATA_ProjectPhases", {
   Name: varchar("Name", { length: 100 }).notNull(),
   StartDate: date("StartDate", { mode: "string" }).notNull(),
   EndDate: date("EndDate", { mode: "string" }).notNull(),
+  ActualStartDate: date("ActualStartDate", { mode: "string" }),
+  ActualEndDate: date("ActualEndDate", { mode: "string" }),
   Sequence: integer("Sequence").notNull().default(0),
   ...auditColumns,
 });

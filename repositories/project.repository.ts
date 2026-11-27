@@ -51,7 +51,7 @@ export async function getProjectDetail(newId: string): Promise<ProjectDetail | n
       [project.Id]
     ),
     query<ProjectDetail["Phases"][number]>(
-      `SELECT "Id", "Name", "StartDate"::text AS "StartDate", "EndDate"::text AS "EndDate", "Sequence"
+      `SELECT "Id", "Name", "StartDate"::text AS "StartDate", "EndDate"::text AS "EndDate", "ActualStartDate"::text AS "ActualStartDate", "ActualEndDate"::text AS "ActualEndDate", "Sequence"
        FROM "DATA_ProjectPhases" WHERE "ProjectId" = $1 ORDER BY "Sequence", "Id"`,
       [project.Id]
     ),
@@ -82,7 +82,7 @@ function normalizeChildren(input: CreateProjectInput) {
       .map(([environment, url]) => [environment.trim(), url.trim()] as const)
       .filter(([, url]) => url !== ""),
     tagIds: Array.from(new Set(input.tags)),
-    techStack: input.techStack.map((item) => ({ category: item.category, technology: item.technology.trim() })).filter((item) => item.technology),
+    techStack: input.techStack.map((item) => ({ category: item.category, technology: item.technology.trim(), version: item.version.trim() })),
   };
 }
 
@@ -121,9 +121,9 @@ async function insertChildren(
 ) {
   for (const [index, phase] of input.phases.entries()) {
     await client.query(
-      `INSERT INTO "DATA_ProjectPhases" ("ProjectId", "Name", "StartDate", "EndDate", "Sequence", "CreatedBy", "CreatedDate")
-       VALUES ($1, $2, $3, $4, $5, $6, now())`,
-      [projectId, phase.name, phase.start, phase.end, index + 1, by]
+      `INSERT INTO "DATA_ProjectPhases" ("ProjectId", "Name", "StartDate", "EndDate", "ActualStartDate", "ActualEndDate", "Sequence", "CreatedBy", "CreatedDate")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())`,
+      [projectId, phase.name, phase.start, phase.end, phase.actualStart || null, phase.actualEnd || null, index + 1, by]
     );
   }
   for (const categoryId of children.tagIds) {
